@@ -40,8 +40,22 @@ using HASH_SET = gtl::flat_hash_set<T>;
 template<class T, class V>
 using HASH_MAP = gtl::flat_hash_map<T, V>;
 
+template<class T>
+using CONCURRENT_HASH_SET = gtl::parallel_flat_hash_set<
+	T,
+	gtl::priv::hash_default_hash<T>,
+	gtl::priv::hash_default_eq<T>,
+	gtl::priv::Allocator<T>,
+	4, std::mutex>;
+
 template<class T, class V>
-using CONCURRENT_HASH_MAP = gtl::parallel_flat_hash_map<T, V>;
+using CONCURRENT_HASH_MAP = gtl::parallel_flat_hash_map<
+	T,
+	V,
+	gtl::priv::hash_default_hash<T>,
+	gtl::priv::hash_default_eq<T>,
+	gtl::priv::Allocator<gtl::priv::Pair<const T, V>>,
+	4, std::mutex>;
 
 struct ProbContext {
 	double prob = 0;
@@ -80,7 +94,6 @@ public:
 		memset(col, 0, sizeof(col));
 	}
 	virtual ~PCFinder() {
-		delete hash_set;
 	}
 
 	PCFinder(const PCFinder&) = default;
@@ -91,7 +104,7 @@ public:
 		hio.read(*hash_set, filename);
 		hash_set->insert(0);
 #ifdef DEBUG_PRINT
-		printf("%s size : %ull\n", filename.c_str(), hash_set.size());
+		printf("%s size : %ull\n", filename.c_str(), hash_set->size());
 #endif
 	}
 
@@ -483,57 +496,12 @@ protected:
 #ifndef ONLINE_SOLVE
 			memcpy(col + depth + 1, col + depth, sizeof(col[0]));
 #endif
-			fp += 4;
-			int c = 0;
-			if (*fp == FULL) c += 1;
-			if (*(fp + 1) == FULL) c += 2;
-			if (*(fp + 2) == FULL) c += 4;
-			if (*(fp + 3) == FULL) c += 8;
-			if (c == 2) {
-				swap(*(fp + 1), *fp);
-			}
-			else if (c == 4) {
-				swap(*(fp + 2), *(fp + 1));
-				swap(*(fp + 1), *fp);
-			}
-			else if (c == 5) {
-				swap(*(fp + 2), *(fp + 1));
-			}
-			else if (c == 6) {
-				swap(*(fp + 2), *fp);
-			}
-			else if (c == 8) {
-				swap(*(fp + 3), *(fp + 2));
-				swap(*(fp + 2), *(fp + 1));
-				swap(*(fp + 1), *fp);
-			}
-			else if (c == 9) {
-				swap(*(fp + 3), *(fp + 2));
-				swap(*(fp + 2), *(fp + 1));
-			}
-			else if (c == 10) {
-				swap(*(fp + 3), *(fp + 2));
-				swap(*(fp + 2), *fp);
-			}
-			else if (c == 11) {
-				swap(*(fp + 3), *(fp + 2));
-			}
-			else if (c == 12) {
-				swap(*(fp + 2), *fp);
-				swap(*(fp + 3), *(fp + 1));
-			}
-			else if (c == 13) {
-				swap(*(fp + 3), *(fp + 1));
-			}
-			else if (c == 14) {
-				swap(*(fp + 3), *fp);
-			}
+			clearLines(fp + 4);
 #ifdef GENERATE_ENDGAME
-			if (depth == 4) memcpy(field5, fp, sizeof(*fp) * 4);
-			if (depth == 5) memcpy(field6, fp, sizeof(*fp) * 4);
+			if (depth == 4) memcpy(field5, fp + 4, sizeof(*fp) * 4);
+			if (depth == 5) memcpy(field6, fp + 4, sizeof(*fp) * 4);
 #endif  
 			prob = dfs(depth + 1, pr.prob);
-			fp -= 4;
 		}
 		else {
 			fc();
@@ -578,6 +546,53 @@ protected:
 			q.pop_front();
 		}
 		writer.writeCount(255);
+	}
+
+	inline void clearLines(bitset<10> *fp) {
+		int c = 0;
+		if (*fp == FULL) c += 1;
+		if (*(fp + 1) == FULL) c += 2;
+		if (*(fp + 2) == FULL) c += 4;
+		if (*(fp + 3) == FULL) c += 8;
+		if (c == 2) {
+			swap(*(fp + 1), *fp);
+		}
+		else if (c == 4) {
+			swap(*(fp + 2), *(fp + 1));
+			swap(*(fp + 1), *fp);
+		}
+		else if (c == 5) {
+			swap(*(fp + 2), *(fp + 1));
+		}
+		else if (c == 6) {
+			swap(*(fp + 2), *fp);
+		}
+		else if (c == 8) {
+			swap(*(fp + 3), *(fp + 2));
+			swap(*(fp + 2), *(fp + 1));
+			swap(*(fp + 1), *fp);
+		}
+		else if (c == 9) {
+			swap(*(fp + 3), *(fp + 2));
+			swap(*(fp + 2), *(fp + 1));
+		}
+		else if (c == 10) {
+			swap(*(fp + 3), *(fp + 2));
+			swap(*(fp + 2), *fp);
+		}
+		else if (c == 11) {
+			swap(*(fp + 3), *(fp + 2));
+		}
+		else if (c == 12) {
+			swap(*(fp + 2), *fp);
+			swap(*(fp + 3), *(fp + 1));
+		}
+		else if (c == 13) {
+			swap(*(fp + 3), *(fp + 1));
+		}
+		else if (c == 14) {
+			swap(*(fp + 3), *fp);
+		}
 	}
 };
 
@@ -818,7 +833,7 @@ protected:
 	auxNode* p = nullptr;
 
 	CONCURRENT_HASH_MAP<ull, bool> *hash_map;
-	HASH_SET<ull> *hash_end_game5, *hash_end_game6;
+	HASH_SET<ull>*hash_end_game5, *hash_end_game6;
 
 public:
 	OnlinePCFinder() : PCFinder() {
@@ -829,20 +844,17 @@ public:
 	}
 
 	virtual ~OnlinePCFinder() {
-		delete aux_tr;
-		delete hash_map;
-		delete hash_end_game5;
-		delete hash_end_game6;
 	}
 
-	void setHashSets(CONCURRENT_HASH_MAP<ull, bool> *hsmp, HASH_SET<ull> *hseg5, HASH_SET<ull> *hseg6) {
+	void setHashSets(CONCURRENT_HASH_MAP<ull, bool> *hsmp, HASH_SET<ull>*hseg5, HASH_SET<ull>*hseg6) {
 		hash_map = hsmp;
 		hash_end_game5 = hseg5;
 		hash_end_game6 = hseg6;
 	}
 
-	void setAuxTree(auxTree* tr) {
+	void setAuxTree(auxTree* tr, auxNode* node) {
 		aux_tr = tr;
+		p = node;
 	}
 
 	void setState(int bag_idx, deque<int> pieces, bitset<7> bag_used, bitset<10> field[4], int depth) {
@@ -904,8 +916,8 @@ public:
 		hio.read(*hash_end_game6, hash6);
 
 #ifdef DEBUG_PRINT
-		printf("%s size : %ull\n", hash5.c_str(), hash_end_game5.size());
-		printf("%s size : %ull\n", hash6.c_str(), hash_end_game6.size());
+		printf("%s size : %ull\n", hash5.c_str(), hash_end_game5->size());
+		printf("%s size : %ull\n", hash6.c_str(), hash_end_game6->size());
 #endif
 	}
 
@@ -990,13 +1002,17 @@ protected:
 			if (depth == 6 && end_game_prune6(get_field_hash(field + 24))) return 0;
 			if (depth == 5) {
 				ull hash = get_state_hash();
-				if (hash_map->find(hash) == hash_map->end()) {
+
+				bool prob = 0;
+				bool is_contain = hash_map->if_contains(hash, [&prob](CONCURRENT_HASH_MAP<ull, bool>::value_type& item) { prob = item.second; });
+
+				if (!is_contain) {
 					dfs2(depth, pr);
-					(*hash_map)[hash] = pr.prob;
+					prob = pr.prob;
+					hash_map->try_emplace_l(hash, [](CONCURRENT_HASH_MAP<ull, bool>::value_type& item) {}, prob);
+					// (*hash_map)[hash] = pr.prob;
 				}
-				else {
-					return (*hash_map)[hash];
-				}
+				return prob;
 			}
 			dfs2(depth, pr);
 			return pr.prob;
@@ -1108,6 +1124,10 @@ private:
 public:
 	OnlinePCFinderDepthOne() : OnlinePCFinder() {}
 
+	void reset() {
+		v_possible_drops.clear();
+	}
+
 	const vector<array<int, 7>>& getPossibleDrops() {
 		return v_possible_drops;
 	}
@@ -1125,53 +1145,14 @@ private:
 		}
 		bitset<10> fp_new[4];
 		memcpy(fp_new, fp, sizeof(*fp) * 4);
-		fp = fp_new;
-		int c = 0;
-		if (*fp == FULL) c += 1;
-		if (*(fp + 1) == FULL) c += 2;
-		if (*(fp + 2) == FULL) c += 4;
-		if (*(fp + 3) == FULL) c += 8;
-		if (c == 2) {
-			swap(*(fp + 1), *fp);
-		}
-		else if (c == 4) {
-			swap(*(fp + 2), *(fp + 1));
-			swap(*(fp + 1), *fp);
-		}
-		else if (c == 5) {
-			swap(*(fp + 2), *(fp + 1));
-		}
-		else if (c == 6) {
-			swap(*(fp + 2), *fp);
-		}
-		else if (c == 8) {
-			swap(*(fp + 3), *(fp + 2));
-			swap(*(fp + 2), *(fp + 1));
-			swap(*(fp + 1), *fp);
-		}
-		else if (c == 9) {
-			swap(*(fp + 3), *(fp + 2));
-			swap(*(fp + 2), *(fp + 1));
-		}
-		else if (c == 10) {
-			swap(*(fp + 3), *(fp + 2));
-			swap(*(fp + 2), *fp);
-		}
-		else if (c == 11) {
-			swap(*(fp + 3), *(fp + 2));
-		}
-		else if (c == 12) {
-			swap(*(fp + 2), *fp);
-			swap(*(fp + 3), *(fp + 1));
-		}
-		else if (c == 13) {
-			swap(*(fp + 3), *(fp + 1));
-		}
-		else if (c == 14) {
-			swap(*(fp + 3), *fp);
-		}
+		clearLines(fp_new);
 		array<int, 7> drop_data = { fp_new[0].to_ulong(), fp_new[1].to_ulong(), fp_new[2].to_ulong(), fp_new[3].to_ulong(), x, y, pid };
 		v_possible_drops.push_back(drop_data);
+
+		for (int i = 0; i < 4; ++i) {
+			int nx = x + PIECE_REPR[pid][i][0];
+			(*(fp + y + PIECE_REPR[pid][i][1]))[nx] = false;
+		}
 	}
 
 };
@@ -1186,28 +1167,29 @@ public:
 
 	virtual ProbContext findBestMove() {
 		ProbContext pr;
+		finder_d1.reset();
 		finder_d1.setHashSet(hash_set);
 		finder_d1.setHashSets(hash_map, hash_end_game5, hash_end_game6);
-		finder_d1.setAuxTree(aux_tr);
-		finder_d1.setState(bag_idx, v_pieces, bag_used[current_depth], field, current_depth);
+		finder_d1.setAuxTree(aux_tr, p);
+		finder_d1.setState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
 		finder_d1.findBestMove();
 		vector<array<int, 7>> v_possible_drops = finder_d1.getPossibleDrops();
-		vector<double> v_pr(v_possible_drops.size());
+		int v_size = v_possible_drops.size();
+		vector<double> v_pr(v_size);
 #pragma omp parallel for schedule (dynamic, 1)
-		for (int i = 0; i < v_possible_drops.size(); ++i) {
+		for (int i = 0; i < v_size; ++i) {
 			const auto& item = v_possible_drops[i];
 			OnlinePCFinder finder;
 			finder.setHashSet(hash_set);
 			finder.setHashSets(hash_map, hash_end_game5, hash_end_game6);
-			finder.setAuxTree(aux_tr);
-			bitset<10> field_new[4] = { item[0], item[1], item[2], item[3] };
-			finder.setState(bag_idx, v_pieces, bag_used[current_depth], field_new, current_depth);
+			finder.setAuxTree(aux_tr, p);
+			finder.setState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
 			int selection = (PIECEMAP[item[6]] == v_pieces[0] ? 0 : 1);
 			ProbContext pr = finder.calculateProb(selection, item[4], item[5], item[6], current_depth);
 			v_pr[i] = pr.prob;
 		}
 		ProbContext result;
-		for (int i = 0; i < v_pr.size(); ++i) {
+		for (int i = 0; i < v_size; ++i) {
 			if (v_pr[i] > result.prob) {
 				auto& item = v_possible_drops[i];
 				result = { v_pr[i], item[4], item[5], item[6] };
@@ -1308,7 +1290,7 @@ void solve_parallel() {
 	finder_parallel.loadHashSet("field_hash.dat");
 	finder_parallel.loadEndGameHashSet("hash_end_game5.dat", "hash_end_game6.dat");
 	simulator.initialize();
-
+	std::chrono::time_point<std::chrono::system_clock> t_begin = std::chrono::system_clock::now();
 	for (int i = 0; i < 9; ++i) {
 		deque<int> pieces;
 		bitset<7> bag_used;
@@ -1332,6 +1314,8 @@ void solve_parallel() {
 		simulator.action(selection, pr.x, pr.y, pr.ori);
 		if (i < 5) finder_parallel.action(selection, pr.x, pr.y, pr.ori);
 	}
+	std::chrono::time_point<std::chrono::system_clock> t_end = std::chrono::system_clock::now();
+	std::cout << "Time spent: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_begin).count() / 1000.0 << "s\n";
 }
 
 void solve_test() {
@@ -1370,7 +1354,7 @@ int main() {
 #endif
 
 #ifdef ONLINE_SOLVE
-	solve();
+	solve_parallel();
 #endif
 
 #ifdef GENERATE_ENDGAME
