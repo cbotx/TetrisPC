@@ -7,6 +7,6 @@
 using namespace std;
 
 struct auxNode {
-	opData op;
+	opData op = { -1,0,0 };
 	vector<auxNode*> v[2];
 };

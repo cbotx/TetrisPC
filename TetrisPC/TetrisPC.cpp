@@ -822,10 +822,14 @@ protected:
 
 public:
 	OnlinePCFinder() : PCFinder() {
+		aux_tr = nullptr;
 		hash_map = new CONCURRENT_HASH_MAP<ull, bool>;
+		hash_end_game5 = nullptr;
+		hash_end_game6 = nullptr;
 	}
 
 	virtual ~OnlinePCFinder() {
+		delete aux_tr;
 		delete hash_map;
 		delete hash_end_game5;
 		delete hash_end_game6;
