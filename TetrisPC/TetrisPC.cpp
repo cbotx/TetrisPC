@@ -40,6 +40,9 @@ using HASH_SET = gtl::flat_hash_set<T>;
 template<class T, class V>
 using HASH_MAP = gtl::flat_hash_map<T, V>;
 
+template<class T, class V>
+using CONCURRENT_HASH_MAP = gtl::parallel_flat_hash_map<T, V>;
+
 struct ProbContext {
 	double prob = 0;
 	int x = 0;
@@ -66,14 +69,18 @@ protected:
 	deque<opData> q;
 	int go_back_cnt = 0;
 
-	HASH_SET<ull> hash_set;
+	HASH_SET<ull> *hash_set;
 	bool hash_gen = false;
 
 public:
 	PCFinder() {
+		hash_set = new HASH_SET<ull>;
 		memset(used_count, 0, sizeof(used_count));
 		memset(field, 0, sizeof(field));
 		memset(col, 0, sizeof(col));
+	}
+	virtual ~PCFinder() {
+		delete hash_set;
 	}
 
 	PCFinder(const PCFinder&) = default;
@@ -81,11 +88,15 @@ public:
 	
 	void loadHashSet(string filename) {
 		HashIO hio;
-		hio.read(hash_set, filename);
-		hash_set.insert(0);
+		hio.read(*hash_set, filename);
+		hash_set->insert(0);
 #ifdef DEBUG_PRINT
 		printf("%s size : %ull\n", filename.c_str(), hash_set.size());
 #endif
+	}
+
+	void setHashSet(HASH_SET<ull>* hs) {
+		hash_set = hs;
 	}
 
 	void setOutputFile(string filename) {
@@ -107,7 +118,7 @@ public:
 		dfs(0, 0);
 		writer.closeFile();
 	}
-	const HASH_SET<ull>& getHashSet() {
+	const HASH_SET<ull>* getHashSet() {
 		return hash_set;
 	}
 
@@ -426,7 +437,7 @@ protected:
 	virtual void fc() {
 		if (hash_gen) {
 			for (int i = 0; i < 9; ++i) {
-				hash_set.insert(get_field_hash(field + i * 4));
+				hash_set->insert(get_field_hash(field + i * 4));
 			}
 		}
 		if (is_output) {
@@ -598,7 +609,7 @@ public:
 
 protected:
 	virtual bool prune(int depth) {
-		return hash_set.find(get_field_hash(field + depth * 4)) == hash_set.end();
+		return hash_set->find(get_field_hash(field + depth * 4)) == hash_set->end();
 	}
 
 	inline ull get_end_game_hash5() {
@@ -673,9 +684,9 @@ protected:
 	int selections[5]{ 0 };
 	auxNode* path[6]{ 0 };
 	int lowest = 0;
-	HASH_SET<ull>& hash_set_r;
+	HASH_SET<ull>* hash_set_r;
 public:
-	auxTree(HASH_SET<ull>& s) : PCFinder(), hash_set_r(s) {
+	explicit auxTree(HASH_SET<ull>* s) : PCFinder(), hash_set_r(s) {
 		root = new auxNode();
 		p = root;
 		path[0] = root;
@@ -688,7 +699,7 @@ public:
 		dfs(0, 0);
 	}
 	virtual double dfs(int depth, double alpha) {
-		if (hash_set_r.find(get_field_hash(field + depth * 4)) == hash_set_r.end()) return 0;
+		if (hash_set_r->find(get_field_hash(field + depth * 4)) == hash_set_r->end()) return 0;
 		ProbContext pr;
 
 		int p1 = v_pieces[0];
@@ -769,7 +780,7 @@ public:
 				lowest = min(lowest, depth);
 			}
 			else {
-				if (hash_set_r.find(get_field_hash(fp)) == hash_set_r.end()) {
+				if (hash_set_r->find(get_field_hash(fp)) == hash_set_r->end()) {
 					lowest = min(lowest, depth);
 				}
 				else {
@@ -803,15 +814,31 @@ protected:
 	deque<int> v_pieces;
 	bitset<7> bag_used[10];
 
-	auxTree aux_tr;
+	auxTree* aux_tr;
 	auxNode* p = nullptr;
 
-	HASH_MAP<ull, bool> hash_map;
-	HASH_SET<ull> hash_end_game5, hash_end_game6;
+	CONCURRENT_HASH_MAP<ull, bool> *hash_map;
+	HASH_SET<ull> *hash_end_game5, *hash_end_game6;
 
 public:
-	OnlinePCFinder() : PCFinder(), aux_tr(hash_set) {
+	OnlinePCFinder() : PCFinder() {
+		hash_map = new CONCURRENT_HASH_MAP<ull, bool>;
+	}
 
+	virtual ~OnlinePCFinder() {
+		delete hash_map;
+		delete hash_end_game5;
+		delete hash_end_game6;
+	}
+
+	void setHashSets(CONCURRENT_HASH_MAP<ull, bool> *hsmp, HASH_SET<ull> *hseg5, HASH_SET<ull> *hseg6) {
+		hash_map = hsmp;
+		hash_end_game5 = hseg5;
+		hash_end_game6 = hseg6;
+	}
+
+	void setAuxTree(auxTree* tr) {
+		aux_tr = tr;
 	}
 
 	void setState(int bag_idx, deque<int> pieces, bitset<7> bag_used, bitset<10> field[4], int depth) {
@@ -822,7 +849,18 @@ public:
 		current_depth = depth;
 	}
 
-	ProbContext findBestMove() {
+
+	ProbContext calculateProb(int selection, int x, int y, int ori, int depth) {
+		ProbContext pr;
+		if (depth < 5) action(selection, x, y, ori);
+		if (selection == 1) swap(v_pieces[0], v_pieces[1]);
+		v_pieces.pop_front();
+		bag_idx = (bag_idx + 1) % 7;
+		fit(field + depth * 4, x, y, ori, depth, pr);
+		return pr;
+	}
+
+	virtual ProbContext findBestMove() {
 		ProbContext pr;
 		if (current_depth < 5) {
 			dfs_aux(current_depth, pr);
@@ -846,15 +884,20 @@ public:
 		return succ;
 	}
 
+	
+
 	void constructTree() {
-		aux_tr.constructTree(v_pieces);
-		p = aux_tr.getRoot();
+		aux_tr = new auxTree(hash_set);
+		aux_tr->constructTree(v_pieces);
+		p = aux_tr->getRoot();
 	}
 
 	void loadEndGameHashSet(string hash5, string hash6) {
 		HashIO hio;
-		hio.read(hash_end_game5, hash5);
-		hio.read(hash_end_game6, hash6);
+		hash_end_game5 = new HASH_SET<ull>;
+		hash_end_game6 = new HASH_SET<ull>;
+		hio.read(*hash_end_game5, hash5);
+		hio.read(*hash_end_game6, hash6);
 
 #ifdef DEBUG_PRINT
 		printf("%s size : %ull\n", hash5.c_str(), hash_end_game5.size());
@@ -891,7 +934,7 @@ protected:
 					piece_hash |= 1 << v_pieces[j];
 				}
 			}
-			if (hash_end_game5.find((field_hash << 7) | piece_hash) != hash_end_game5.end()) {
+			if (hash_end_game5->find((field_hash << 7) | piece_hash) != hash_end_game5->end()) {
 #ifdef DEBUG_PRINT
 				++not_prune5;
 #endif
@@ -912,7 +955,7 @@ protected:
 					piece_hash |= 1 << v_pieces[j];
 				}
 			}
-			if (hash_end_game6.find((field_hash << 7) | piece_hash) != hash_end_game6.end()) {
+			if (hash_end_game6->find((field_hash << 7) | piece_hash) != hash_end_game6->end()) {
 #ifdef DEBUG_PRINT
 				++not_prune6;
 #endif
@@ -929,7 +972,7 @@ protected:
 #ifdef DEBUG_PRINT
 		++func_calls[4][depth];
 #endif
-		if (hash_set.find(get_field_hash(field + depth * 4)) == hash_set.end()) return 0;
+		if (hash_set->find(get_field_hash(field + depth * 4)) == hash_set->end()) return 0;
 		double prob = 0;
 		int cnt = 0;
 		int cnt2 = 0;
@@ -943,12 +986,12 @@ protected:
 			if (depth == 6 && end_game_prune6(get_field_hash(field + 24))) return 0;
 			if (depth == 5) {
 				ull hash = get_state_hash();
-				if (hash_map.find(hash) == hash_map.end()) {
+				if (hash_map->find(hash) == hash_map->end()) {
 					dfs2(depth, pr);
-					hash_map[hash] = pr.prob;
+					(*hash_map)[hash] = pr.prob;
 				}
 				else {
-					return hash_map[hash];
+					return (*hash_map)[hash];
 				}
 			}
 			dfs2(depth, pr);
@@ -1054,6 +1097,126 @@ protected:
 	}
 };
 
+class OnlinePCFinderDepthOne : public OnlinePCFinder {
+private:
+	vector<array<int, 7>> v_possible_drops;
+
+public:
+	OnlinePCFinderDepthOne() : OnlinePCFinder() {}
+
+	const vector<array<int, 7>>& getPossibleDrops() {
+		return v_possible_drops;
+	}
+
+private:
+	virtual void fit(bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
+		pieces_ori[depth] = pid;
+		if (is_output) {
+			opData opdata = { pid, x, y };
+			q.push_back(opdata);
+		}
+		for (int i = 0; i < 4; ++i) {
+			int nx = x + PIECE_REPR[pid][i][0];
+			(*(fp + y + PIECE_REPR[pid][i][1]))[nx] = true;
+		}
+		bitset<10> fp_new[4];
+		memcpy(fp_new, fp, sizeof(*fp) * 4);
+		fp = fp_new;
+		int c = 0;
+		if (*fp == FULL) c += 1;
+		if (*(fp + 1) == FULL) c += 2;
+		if (*(fp + 2) == FULL) c += 4;
+		if (*(fp + 3) == FULL) c += 8;
+		if (c == 2) {
+			swap(*(fp + 1), *fp);
+		}
+		else if (c == 4) {
+			swap(*(fp + 2), *(fp + 1));
+			swap(*(fp + 1), *fp);
+		}
+		else if (c == 5) {
+			swap(*(fp + 2), *(fp + 1));
+		}
+		else if (c == 6) {
+			swap(*(fp + 2), *fp);
+		}
+		else if (c == 8) {
+			swap(*(fp + 3), *(fp + 2));
+			swap(*(fp + 2), *(fp + 1));
+			swap(*(fp + 1), *fp);
+		}
+		else if (c == 9) {
+			swap(*(fp + 3), *(fp + 2));
+			swap(*(fp + 2), *(fp + 1));
+		}
+		else if (c == 10) {
+			swap(*(fp + 3), *(fp + 2));
+			swap(*(fp + 2), *fp);
+		}
+		else if (c == 11) {
+			swap(*(fp + 3), *(fp + 2));
+		}
+		else if (c == 12) {
+			swap(*(fp + 2), *fp);
+			swap(*(fp + 3), *(fp + 1));
+		}
+		else if (c == 13) {
+			swap(*(fp + 3), *(fp + 1));
+		}
+		else if (c == 14) {
+			swap(*(fp + 3), *fp);
+		}
+		array<int, 7> drop_data = { fp_new[0].to_ulong(), fp_new[1].to_ulong(), fp_new[2].to_ulong(), fp_new[3].to_ulong(), x, y, pid };
+		v_possible_drops.push_back(drop_data);
+	}
+
+};
+
+class OnlinePCFinderParallel : public OnlinePCFinder {
+private:
+	OnlinePCFinderDepthOne finder_d1;
+public:
+	explicit OnlinePCFinderParallel() : OnlinePCFinder() {
+		
+	}
+
+	virtual ProbContext findBestMove() {
+		ProbContext pr;
+		finder_d1.setHashSet(hash_set);
+		finder_d1.setHashSets(hash_map, hash_end_game5, hash_end_game6);
+		finder_d1.setAuxTree(aux_tr);
+		finder_d1.setState(bag_idx, v_pieces, bag_used[current_depth], field, current_depth);
+		finder_d1.findBestMove();
+		vector<array<int, 7>> v_possible_drops = finder_d1.getPossibleDrops();
+		vector<double> v_pr(v_possible_drops.size());
+#pragma omp parallel for schedule (dynamic, 1)
+		for (int i = 0; i < v_possible_drops.size(); ++i) {
+			const auto& item = v_possible_drops[i];
+			OnlinePCFinder finder;
+			finder.setHashSet(hash_set);
+			finder.setHashSets(hash_map, hash_end_game5, hash_end_game6);
+			finder.setAuxTree(aux_tr);
+			bitset<10> field_new[4] = { item[0], item[1], item[2], item[3] };
+			finder.setState(bag_idx, v_pieces, bag_used[current_depth], field_new, current_depth);
+			int selection = (PIECEMAP[item[6]] == v_pieces[0] ? 0 : 1);
+			ProbContext pr = finder.calculateProb(selection, item[4], item[5], item[6], current_depth);
+			v_pr[i] = pr.prob;
+		}
+		ProbContext result;
+		for (int i = 0; i < v_pr.size(); ++i) {
+			if (v_pr[i] > result.prob) {
+				auto& item = v_possible_drops[i];
+				result = { v_pr[i], item[4], item[5], item[6] };
+			}
+		}
+		return result;
+	}
+private:
+	
+
+};
+
+
 
 
 void benchmark() {
@@ -1082,7 +1245,8 @@ void generate_hash() {
 	}
 	HASH_SET<ull> aggr_set;
 	for (int i = 0; i < 7; ++i) {
-		for (auto& item : v_finder[i].getHashSet()) {
+		const HASH_SET<ull>* hs = v_finder[i].getHashSet();
+		for (auto& item : *hs) {
 			aggr_set.insert(item);
 		}
 	}
@@ -1133,6 +1297,39 @@ void solve() {
 	
 }
 
+void solve_parallel() {
+	OnlinePCFinderParallel finder_parallel;
+	Simulator simulator;
+
+	finder_parallel.loadHashSet("field_hash.dat");
+	finder_parallel.loadEndGameHashSet("hash_end_game5.dat", "hash_end_game6.dat");
+	simulator.initialize();
+
+	for (int i = 0; i < 9; ++i) {
+		deque<int> pieces;
+		bitset<7> bag_used;
+		int bag_idx;
+		bitset<10> field[4];
+		simulator.getState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
+		finder_parallel.setState(bag_idx, pieces, bag_used, field, i);
+		if (i == 0) finder_parallel.constructTree();
+		ProbContext pr = finder_parallel.findBestMove();
+		for (auto& item : pieces) {
+			cout << PIECENAME[item];
+		}
+		cout << '\n';
+		printf("%.2f%% Winning | Piece Code %d | x=%d y=%d\n", pr.prob * 100, pr.ori, pr.x, pr.y);
+		if (pr.ori < 0) {
+			cout << "FAILED\n";
+			break;
+		}
+		int selection = 0;
+		if (PIECEMAP[pr.ori] == pieces[1]) selection = 1;
+		simulator.action(selection, pr.x, pr.y, pr.ori);
+		if (i < 5) finder_parallel.action(selection, pr.x, pr.y, pr.ori);
+	}
+}
+
 void solve_test() {
 	OnlinePCFinder finder;
 	Simulator simulator;
@@ -1154,6 +1351,7 @@ void solve_test() {
 		cout << "FAILED\n";
 	}
 }
+
 
 void generate_endgame() {
 	endGameGenerator generator;

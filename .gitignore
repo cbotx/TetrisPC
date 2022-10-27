@@ -435,3 +435,6 @@ FodyWeavers.xsd
 
 #GPUCache
 /GPUCache
+
+# VS Code
+/.vscode
