@@ -824,6 +824,7 @@ public:
 
 class OnlinePCFinder : public PCFinder {
 protected:
+	int initial_depth = 0;
 	int current_depth = 0;
 	int bag_idx = 0;
 	deque<int> v_pieces;
@@ -834,6 +835,8 @@ protected:
 
 	CONCURRENT_HASH_MAP<ull, bool> *hash_map;
 	HASH_SET<ull>*hash_end_game5, *hash_end_game6;
+
+	double* p_alpha = nullptr;
 
 public:
 	OnlinePCFinder() : PCFinder() {
@@ -863,8 +866,12 @@ public:
 		this->bag_used[depth] = bag_used;
 		init_field(field, depth);
 		current_depth = depth;
+		initial_depth = depth;
 	}
 
+	void setAlpha(double* p) {
+		p_alpha = p;
+	}
 
 	ProbContext calculateProb(int selection, int x, int y, int ori, int depth) {
 		ProbContext pr;
@@ -1034,6 +1041,9 @@ protected:
 				bag_used[depth + 1][i] = 0;
 				v_pieces.pop_back();
 				++cnt2;
+				if (depth == initial_depth + 1) {
+					alpha = *p_alpha;
+				}
 				prob += pr.prob;
 				if (prob + cnt - cnt2 < alpha * cnt) break;
 			}
@@ -1176,6 +1186,7 @@ public:
 		vector<array<int, 7>> v_possible_drops = finder_d1.getPossibleDrops();
 		int v_size = v_possible_drops.size();
 		vector<double> v_pr(v_size);
+		double* p_alpha = new double(0);
 #pragma omp parallel for schedule (dynamic, 1)
 		for (int i = 0; i < v_size; ++i) {
 			const auto& item = v_possible_drops[i];
@@ -1184,10 +1195,14 @@ public:
 			finder.setHashSets(hash_map, hash_end_game5, hash_end_game6);
 			finder.setAuxTree(aux_tr, p);
 			finder.setState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
+			finder.setAlpha(p_alpha);
 			int selection = (PIECEMAP[item[6]] == v_pieces[0] ? 0 : 1);
 			ProbContext pr = finder.calculateProb(selection, item[4], item[5], item[6], current_depth);
 			v_pr[i] = pr.prob;
+#pragma omp critical
+			*p_alpha = max(*p_alpha, pr.prob);
 		}
+		delete p_alpha;
 		ProbContext result;
 		for (int i = 0; i < v_size; ++i) {
 			if (v_pr[i] > result.prob) {
