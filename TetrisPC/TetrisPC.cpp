@@ -59,8 +59,12 @@ struct ProbContext {
 };
 
 class PCFinder {
-   protected:
+   private:
     int used_count[7];
+    std::bitset<10> superposition = 0;
+    int start_bag_idx = 0;
+
+   protected:
     std::bitset<10> field[40];
     std::bitset<10> field5[4];
     std::bitset<10> field6[4];
@@ -100,8 +104,9 @@ class PCFinder {
         hash_set = hs;
     }
 
-    void setFirstPiece(int i) {
+    void setFirstPiece(int i, int bag_idx) {
         first_piece = i;
+        start_bag_idx = bag_idx;
     }
 
     void setHashMode(bool gen) {
@@ -110,8 +115,9 @@ class PCFinder {
 
     void start() {
         for (int i = 0; i < 7; ++i) {
-            ++used_count[i];
+            used_count[i] = 1;
         }
+        if (first_piece >= 0) ++used_count[first_piece];
         dfs(0, 0);
     }
 
@@ -132,9 +138,11 @@ class PCFinder {
 
     virtual bool prune(int depth) {
         int empty_count = 0;
+        std::bitset<10>* fp = field + depth * 4;
+        std::bitset<10> seperated = (*fp | *fp >> 1) & (*(fp + 1) | *(fp + 1) >> 1) & (*(fp + 2) | *(fp + 2) >> 1) & (*(fp + 3) | *(fp + 3) >> 1);
         for (int i = 0; i < 9; ++i) {
             empty_count += 4 - col[depth][i];
-            if (col[depth][i] == 4 && (empty_count % 4)) return true;
+            if ((col[depth][i] == 4 || seperated[i]) && (empty_count % 4)) return true;
         }
         return false;
     }
@@ -149,6 +157,59 @@ class PCFinder {
     }
 
     virtual double dfs(int depth, double alpha) {
+        ProbContext pr;
+        if (prune(depth)) return 1;
+        int old_used_count[7];
+        std::bitset<10> old_superposition = superposition;
+        memcpy(old_used_count, used_count, sizeof(used_count));
+        if ((depth + start_bag_idx) % 7 == 6) {
+            int cnt = 0;
+            for (int i = 0; i < 7; ++i) {
+                if (used_count[i] == 2) {
+                    memset(used_count, 0, sizeof(used_count));
+                    used_count[i] = 1;
+                    cnt = 1;
+                    break;
+                }
+                if (used_count[i] == 1) ++cnt;
+            }
+            if (cnt > 1) {
+                for (int i = 0; i < 7; ++i) {
+                    if (used_count[i] == 1) {
+                        superposition[i] = 1;
+                    }
+                }
+            }
+            for (int i = 0; i < 7; ++i) ++used_count[i];
+        }
+
+        for (int i = 0; i < 7; ++i) {
+            if (!used_count[i]) continue;
+            pieces[depth] = i;
+            std::bitset<10> old_superposition = superposition;
+            --used_count[i];
+            bool is_collapse = superposition.to_ulong() && !used_count[i] && superposition[i];
+            if (is_collapse) {
+                for (int j = 0; j < 7; ++j) {
+                    if (j != i && superposition[j]) --used_count[j];
+                }
+                superposition = 0;
+            }
+            try_fit(i, field + depth * 4, depth, pr);
+            if (is_collapse) {
+                superposition = old_superposition;
+                for (int j = 0; j < 7; ++j) {
+                    if (j != i && superposition[j]) ++used_count[j];
+                }
+            }
+            ++used_count[i];
+        }
+        superposition = old_superposition;
+        memcpy(used_count, old_used_count, sizeof(used_count));
+        return 1;
+    }
+
+    virtual double dfs_old(int depth, double alpha) {
         ProbContext pr;
         if (depth == 0 && first_piece >= 0) {
             pieces[0] = first_piece;
@@ -425,7 +486,7 @@ class PCFinder {
 
 #ifdef DEBUG_PRINT
         ++total;
-        if (total % 10000 == 0) {
+        if (total % 1000000 == 0) {
             std::cout << first_piece << "  :  ";
             ll idx = 0;
             for (int i = 0; i < 10; ++i) {
@@ -539,6 +600,11 @@ class endGameGenerator : public PCFinder {
         hio.write(hash_end_game6, hash6);
     }
 
+    void getHashEndGame(HASH_SET<ull>*& hash5, HASH_SET<ull>*& hash6) {
+        hash5 = &hash_end_game5;
+        hash6 = &hash_end_game6;
+    }
+
     void setState(int bag_idx, std::deque<int> pieces, std::vector<int> prev_pieces, std::bitset<10> field[4], int depth) {
         this->bag_idx = bag_idx;
         this->v_pieces = pieces;
@@ -573,8 +639,12 @@ class endGameGenerator : public PCFinder {
     }
 
     virtual void fc() {
+#ifdef DEBUG_PRINT
         ++total;
-        if (total % 100000 == 0) std::cout << total << ' ' << hash_end_game5.size() << ' ' << hash_end_game6.size() << '\n';
+        if (total % 10000000 == 0) {
+            std::cout << total << ' ' << hash_end_game5.size() << ' ' << hash_end_game6.size() << '\n';
+        }
+#endif
         hash_end_game5.insert(get_end_game_hash5());
         hash_end_game6.insert(get_end_game_hash6());
     }
@@ -605,17 +675,22 @@ class auxTree : public PCFinder {
 
    public:
     explicit auxTree(HASH_SET<ull>* s) : PCFinder(), hash_set_r(s) {
-        root = new auxNode();
-        p = root;
-        path[0] = root;
+        initialize();
     }
     auxNode* getRoot() {
         return root;
     }
+
     void constructTree(std::deque<int>& v_pieces) {
         this->v_pieces = v_pieces;
         dfs(0, 0);
     }
+
+    void destroyTree() {
+        destroy_node(root);
+        initialize();
+    }
+
     virtual double dfs(int depth, double alpha) {
         if (hash_set_r->find(get_field_hash(field + depth * 4)) == hash_set_r->end()) return 0;
         ProbContext pr;
@@ -709,6 +784,19 @@ class auxTree : public PCFinder {
             (*(fp + y + PIECE_REPR[pid][i][1]))[nx] = false;
         }
     }
+
+   private:
+    void destroy_node(auxNode* node) {
+        for (int i = 0; i < 2; ++i) {
+            for (auto& item : node->v[i]) destroy_node(item);
+        }
+        delete node;
+    }
+    void initialize() {
+        root = new auxNode();
+        p = root;
+        path[0] = root;
+    }
 };
 
 class OnlinePCFinder : public PCFinder {
@@ -736,6 +824,10 @@ class OnlinePCFinder : public PCFinder {
     }
 
     virtual ~OnlinePCFinder() {
+    }
+
+    void clearHashMap() {
+        hash_map->clear();
     }
 
     void setHashSets(CONCURRENT_HASH_MAP<ull, bool>* hsmp, HASH_SET<ull>* hseg5, HASH_SET<ull>* hseg6) {
@@ -799,6 +891,10 @@ class OnlinePCFinder : public PCFinder {
         aux_tr = new auxTree(hash_set);
         aux_tr->constructTree(v_pieces);
         p = aux_tr->getRoot();
+    }
+
+    void destroyTree() {
+        aux_tr->destroyTree();
     }
 
     void loadEndGameHashSet(string hash5, string hash6) {
@@ -904,7 +1000,6 @@ class OnlinePCFinder : public PCFinder {
                     prob = pr.prob;
                     hash_map->try_emplace_l(
                         hash, [](CONCURRENT_HASH_MAP<ull, bool>::value_type& item) {}, prob);
-                    // (*hash_map)[hash] = pr.prob;
                 }
                 return prob;
             }
@@ -1084,6 +1179,7 @@ class OnlinePCFinderParallel : public OnlinePCFinder {
             *p_alpha = max(*p_alpha, pr.prob);
         }
         delete p_alpha;
+        clearHashMap();
         ProbContext result;
         for (int i = 0; i < v_size; ++i) {
             if (v_pr[i] > result.prob) {
@@ -1097,27 +1193,31 @@ class OnlinePCFinderParallel : public OnlinePCFinder {
 
 void benchmark() {
     PCFinder finder;
-    finder.setFirstPiece(3);
+    finder.setFirstPiece(3, 3);
     finder.start();
 }
 
-void generate_hash() {
+void generate_hash(int first_bag_idx) {
     std::vector<PCFinder> v_finder(7);
 #pragma omp parallel for
     for (int i = 0; i < 7; ++i) {
-        v_finder[i].setFirstPiece(i);
+        v_finder[i].setFirstPiece(i, first_bag_idx);
         v_finder[i].setHashMode(true);
         v_finder[i].start();
     }
+    HashIO hio;
     HASH_SET<ull> aggr_set;
     for (int i = 0; i < 7; ++i) {
         const HASH_SET<ull>* hs = v_finder[i].getHashSet();
+        std::cout << hs->size() << ' ';
+        hio.write(*hs, "field_hash" + std::to_string(first_bag_idx) + std::to_string(i) + ".dat");
         for (auto& item : *hs) {
             aggr_set.insert(item);
         }
+        delete hs;
     }
-    HashIO hio;
-    hio.write(aggr_set, "field_hash.dat");
+    std::cout << aggr_set.size() << '\n';
+    hio.write(aggr_set, "field_hash" + std::to_string(first_bag_idx) + ".dat");
 }
 
 void solve() {
@@ -1164,38 +1264,52 @@ void solve() {
 }
 
 void solve_parallel() {
-    OnlinePCFinderParallel finder_parallel;
+    TIME_BENCHMARK
+    OnlinePCFinderParallel finder_parallel[7];
     Simulator simulator;
 
-    finder_parallel.loadHashSet("field_hash.dat");
-    finder_parallel.loadEndGameHashSet("hash_end_game5.dat", "hash_end_game6.dat");
-    simulator.initialize();
-    std::chrono::time_point<std::chrono::system_clock> t_begin = std::chrono::system_clock::now();
-    for (int i = 0; i < 9; ++i) {
-        std::deque<int> pieces;
-        std::bitset<7> bag_used;
-        int bag_idx;
-        std::bitset<10> field[4];
-        simulator.getState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
-        finder_parallel.setState(bag_idx, pieces, bag_used, field, i);
-        if (i == 0) finder_parallel.constructTree();
-        ProbContext pr = finder_parallel.findBestMove();
-        for (auto& item : pieces) {
-            std::cout << PIECENAME[item];
-        }
-        std::cout << '\n';
-        printf("%.2f%% Winning | Piece Code %d | x=%d y=%d\n", pr.prob * 100, pr.ori, pr.x, pr.y);
-        if (pr.ori < 0) {
-            std::cout << "FAILED\n";
-            break;
-        }
-        int selection = 0;
-        if (PIECEMAP[pr.ori] == pieces[1]) selection = 1;
-        simulator.action(selection, pr.x, pr.y, pr.ori);
-        if (i < 5) finder_parallel.action(selection, pr.x, pr.y, pr.ori);
+#pragma omp parallel for
+    for (int i = 0; i < 7; ++i) {
+        finder_parallel[i].loadHashSet("field_hash" + to_string(i) + ".dat");
+        finder_parallel[i].loadEndGameHashSet("hash_end_game5_" + to_string(i) + ".dat", "hash_end_game6_" + to_string(i) + ".dat");
     }
-    std::chrono::time_point<std::chrono::system_clock> t_end = std::chrono::system_clock::now();
-    std::cout << "Time spent: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_begin).count() / 1000.0 << "s\n";
+    simulator.initialize();
+    int total_tests = 2;
+    int failed_tests = 0;
+    for (int x = 0; x < total_tests; ++x) {
+        TIME_START;
+        int pc_idx = simulator.getPCIndex();
+        for (int i = 0; i < 10; ++i) {
+            std::deque<int> pieces;
+            std::bitset<7> bag_used;
+            int bag_idx;
+            std::bitset<10> field[4];
+            simulator.getState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
+            finder_parallel[pc_idx].setState(bag_idx, pieces, bag_used, field, i);
+            if (i == 0) finder_parallel[pc_idx].constructTree();
+            ProbContext pr = finder_parallel[pc_idx].findBestMove();
+            for (auto& item : pieces) {
+                std::cout << PIECENAME[item];
+            }
+            std::cout << '\n';
+            std::printf("%.2f%% Winning | Piece Code %d | x=%d y=%d\n", pr.prob * 100, pr.ori, pr.x, pr.y);
+            if (pr.ori < 0) {
+                std::cout << "FAILED\n";
+                ++failed_tests;
+                break;
+            }
+            int selection = 0;
+            if (PIECEMAP[pr.ori] == pieces[1]) selection = 1;
+            simulator.action(selection, pr.x, pr.y, pr.ori);
+            if (i < 5) finder_parallel[pc_idx].action(selection, pr.x, pr.y, pr.ori);
+        }
+        finder_parallel[pc_idx].destroyTree();
+        simulator.softReset();
+        TIME_END;
+    }
+    std::cout << "\n========= Summary =========\n";
+    std::printf("Success rate: %.2f%% (%d/%d)", 100.0 * (total_tests - failed_tests) / total_tests, total_tests - failed_tests, total_tests);
+    std::cout << "\n===========================\n";
 }
 
 void solve_test() {
@@ -1220,20 +1334,37 @@ void solve_test() {
     }
 }
 
-void generate_endgame() {
+void generate_endgame(int first_bag_idx) {
+    HashIO hio;
+    HASH_SET<ull> aggr_set5, aggr_set6;
+    HASH_SET<ull>*p_set5, *p_set6;
     endGameGenerator generator;
-    generator.loadHashSet("field_hash.dat");
-    generator.start();
-    generator.saveHashEndGame("hash_end_game5.dat", "hash_end_game6.dat");
+    generator.loadHashSet("field_hash" + to_string(first_bag_idx) + ".dat");
+    for (int i = 0; i < 7; ++i) {
+        generator.setFirstPiece(i, first_bag_idx);
+        generator.start();
+        generator.getHashEndGame(p_set5, p_set6);
+        for (auto& item : *p_set5) aggr_set5.insert(item);
+        for (auto& item : *p_set6) aggr_set6.insert(item);
+        p_set5->clear();
+        p_set6->clear();
+    }
+    hio.write(aggr_set5, "hash_end_game5_" + to_string(first_bag_idx) + ".dat");
+    hio.write(aggr_set6, "hash_end_game6_" + to_string(first_bag_idx) + ".dat");
 }
 
 int main() {
 #ifdef GENERATE_HASH
-    generate_hash();
+    for (int i = 0; i < 7; ++i) {
+        generate_hash(i);
+    }
 #endif
 
 #ifdef GENERATE_ENDGAME
-    generate_endgame();
+    // #pragma omp parallel for
+    for (int i = 0; i < 7; ++i) {
+        generate_endgame(i);
+    }
 #endif
 
 #ifdef ONLINE_SOLVE
