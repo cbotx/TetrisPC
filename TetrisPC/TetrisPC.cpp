@@ -21,6 +21,8 @@
 
 // #define DEBUG_PRINT
 
+bool debug_switch = false;
+
 int depth_cnt[11] = {0};
 int prune5 = 0;
 int prune6 = 0;
@@ -884,6 +886,7 @@ class OnlinePCFinder : public PCFinder {
                 break;
             }
         }
+        if (!succ) std::cout << "BAD!!!!!!!!!!!!!!\n";
         return succ;
     }
 
@@ -1007,24 +1010,44 @@ class OnlinePCFinder : public PCFinder {
             return pr.prob;
         }
         for (int i = 0; i < 7; ++i) {
-            if (!bag_used[depth][i]) ++cnt;
+            if (!bag_used[depth - 1][i]) ++cnt;
         }
         if (cnt == 0) {
             cnt = 7;
             bag_used[depth] = 0;
+        } else {
+            bag_used[depth] = bag_used[depth - 1];
         }
-        bag_used[depth + 1] = bag_used[depth];
         for (int i = 0; i < 7; ++i) {
             if (!bag_used[depth][i]) {
                 ProbContext pr;
                 v_pieces.push_back(i);
-                bag_used[depth + 1][i] = 1;
+                bag_used[depth][i] = 1;
                 dfs_aux(depth, pr);
-                bag_used[depth + 1][i] = 0;
+                bag_used[depth][i] = 0;
                 v_pieces.pop_back();
                 ++cnt2;
                 if (depth == initial_depth + 1) {
                     alpha = *p_alpha;
+                }
+                if (false) {
+                    if (depth <= 3) {
+                        if (debug_switch) {
+                            if (pr.ori >= 0) {
+                                for (int k = 0; k < depth; ++k) std::cout << "   ";
+                                for (auto& item : v_pieces) std::cout << PIECENAME[item];
+                                std::cout << " | ";
+                                std::cout << PIECENAME[i] << ' ' << pr.prob << ' ' << pr.ori << "=========\n";
+                            }
+                        }
+                        if (depth == 3 && PIECENAME[i] == 'I' && pr.ori == 13 && pr.prob == 1) {
+                            if (PIECENAME[v_pieces[0]] == 'J' && PIECENAME[v_pieces[5]] == 'S') {
+                                std::cout << p->op.ori << ' ' << p->op.x << ' ' << p->op.y << ' ';
+                                for (int i = 0; i <= depth; ++i) std::cout << bag_used[i] << ' ';
+                                std::cout << "\n**************************\n";
+                            }
+                        }
+                    }
                 }
                 prob += pr.prob;
                 if (prob + cnt - cnt2 < alpha * cnt) break;
@@ -1150,6 +1173,12 @@ class OnlinePCFinderParallel : public OnlinePCFinder {
    public:
     explicit OnlinePCFinderParallel() : OnlinePCFinder() {
     }
+    virtual ~OnlinePCFinderParallel() {
+        if (hash_set) delete hash_set;
+        if (hash_map) delete hash_map;
+        if (hash_end_game5) delete hash_end_game5;
+        if (hash_end_game6) delete hash_end_game6;
+    }
 
     virtual ProbContext findBestMove() {
         ProbContext pr;
@@ -1263,7 +1292,7 @@ void solve() {
     }
 }
 
-void solve_parallel() {
+void solve_parallel(int total_tests) {
     TIME_BENCHMARK
     OnlinePCFinderParallel finder_parallel[7];
     Simulator simulator;
@@ -1274,10 +1303,9 @@ void solve_parallel() {
         finder_parallel[i].loadEndGameHashSet("hash_end_game5_" + to_string(i) + ".dat", "hash_end_game6_" + to_string(i) + ".dat");
     }
     simulator.initialize();
-    int total_tests = 2;
     int failed_tests = 0;
+    TIME_START;
     for (int x = 0; x < total_tests; ++x) {
-        TIME_START;
         int pc_idx = simulator.getPCIndex();
         for (int i = 0; i < 10; ++i) {
             std::deque<int> pieces;
@@ -1288,11 +1316,13 @@ void solve_parallel() {
             finder_parallel[pc_idx].setState(bag_idx, pieces, bag_used, field, i);
             if (i == 0) finder_parallel[pc_idx].constructTree();
             ProbContext pr = finder_parallel[pc_idx].findBestMove();
+#ifdef DEBUG_PRINT
             for (auto& item : pieces) {
                 std::cout << PIECENAME[item];
             }
             std::cout << '\n';
             std::printf("%.2f%% Winning | Piece Code %d | x=%d y=%d\n", pr.prob * 100, pr.ori, pr.x, pr.y);
+#endif
             if (pr.ori < 0) {
                 std::cout << "FAILED\n";
                 ++failed_tests;
@@ -1305,8 +1335,8 @@ void solve_parallel() {
         }
         finder_parallel[pc_idx].destroyTree();
         simulator.softReset();
-        TIME_END;
     }
+    TIME_END;
     std::cout << "\n========= Summary =========\n";
     std::printf("Success rate: %.2f%% (%d/%d)", 100.0 * (total_tests - failed_tests) / total_tests, total_tests - failed_tests, total_tests);
     std::cout << "\n===========================\n";
@@ -1368,6 +1398,6 @@ int main() {
 #endif
 
 #ifdef ONLINE_SOLVE
-    solve_parallel();
+    solve_parallel(20);
 #endif
 }
