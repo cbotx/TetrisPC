@@ -10,16 +10,9 @@
 
 #include "auxtree.h"
 #include "definition.h"
-#include "gtl/phmap.hpp"
 #include "simulator.h"
 #include "utils.h"
 #include "writer.h"
-
-// #define GENERATE_HASH
-#define ONLINE_SOLVE
-// #define GENERATE_ENDGAME
-
-// #define DEBUG_PRINT
 
 bool debug_switch = false;
 
@@ -29,36 +22,6 @@ int prune6 = 0;
 int not_prune5 = 0;
 int not_prune6 = 0;
 int func_calls[5][10];
-
-template <class T>
-using HASH_SET = gtl::flat_hash_set<T>;
-
-template <class T, class V>
-using HASH_MAP = gtl::flat_hash_map<T, V>;
-
-template <class T>
-using CONCURRENT_HASH_SET = gtl::parallel_flat_hash_set<
-    T,
-    gtl::priv::hash_default_hash<T>,
-    gtl::priv::hash_default_eq<T>,
-    gtl::priv::Allocator<T>,
-    4, std::mutex>;
-
-template <class T, class V>
-using CONCURRENT_HASH_MAP = gtl::parallel_flat_hash_map<
-    T,
-    V,
-    gtl::priv::hash_default_hash<T>,
-    gtl::priv::hash_default_eq<T>,
-    gtl::priv::Allocator<gtl::priv::Pair<const T, V>>,
-    4, std::mutex>;
-
-struct ProbContext {
-    double prob = 0;
-    int x = 0;
-    int y = 0;
-    int ori = -1;
-};
 
 class PCFinder {
    private:
@@ -94,8 +57,7 @@ class PCFinder {
     PCFinder& operator=(const PCFinder&) = default;
 
     void loadHashSet(string filename) {
-        HashIO hio;
-        hio.read(*hash_set, filename);
+        container_read(*hash_set, filename);
         hash_set->insert(0);
 #ifdef DEBUG_PRINT
         printf("%s size : %ull\n", filename.c_str(), hash_set->size());
@@ -597,9 +559,8 @@ class endGameGenerator : public PCFinder {
     }
 
     void saveHashEndGame(string hash5, string hash6) {
-        HashIO hio;
-        hio.write(hash_end_game5, hash5);
-        hio.write(hash_end_game6, hash6);
+        container_write(hash_end_game5, hash5);
+        container_write(hash_end_game6, hash6);
     }
 
     void getHashEndGame(HASH_SET<ull>*& hash5, HASH_SET<ull>*& hash6) {
@@ -901,11 +862,10 @@ class OnlinePCFinder : public PCFinder {
     }
 
     void loadEndGameHashSet(string hash5, string hash6) {
-        HashIO hio;
         hash_end_game5 = new HASH_SET<ull>;
         hash_end_game6 = new HASH_SET<ull>;
-        hio.read(*hash_end_game5, hash5);
-        hio.read(*hash_end_game6, hash6);
+        container_read(*hash_end_game5, hash5);
+        container_read(*hash_end_game6, hash6);
 
 #ifdef DEBUG_PRINT
         printf("%s size : %ull\n", hash5.c_str(), hash_end_game5->size());
@@ -1234,19 +1194,18 @@ void generate_hash(int first_bag_idx) {
         v_finder[i].setHashMode(true);
         v_finder[i].start();
     }
-    HashIO hio;
     HASH_SET<ull> aggr_set;
     for (int i = 0; i < 7; ++i) {
         const HASH_SET<ull>* hs = v_finder[i].getHashSet();
         std::cout << hs->size() << ' ';
-        hio.write(*hs, "field_hash" + std::to_string(first_bag_idx) + std::to_string(i) + ".dat");
+        container_write(*hs, "field_hash" + std::to_string(first_bag_idx) + std::to_string(i) + ".dat");
         for (auto& item : *hs) {
             aggr_set.insert(item);
         }
         delete hs;
     }
     std::cout << aggr_set.size() << '\n';
-    hio.write(aggr_set, "field_hash" + std::to_string(first_bag_idx) + ".dat");
+    container_write(aggr_set, "field_hash" + std::to_string(first_bag_idx) + ".dat");
 }
 
 void solve() {
@@ -1365,7 +1324,6 @@ void solve_test() {
 }
 
 void generate_endgame(int first_bag_idx) {
-    HashIO hio;
     HASH_SET<ull> aggr_set5, aggr_set6;
     HASH_SET<ull>*p_set5, *p_set6;
     endGameGenerator generator;
@@ -1379,8 +1337,8 @@ void generate_endgame(int first_bag_idx) {
         p_set5->clear();
         p_set6->clear();
     }
-    hio.write(aggr_set5, "hash_end_game5_" + to_string(first_bag_idx) + ".dat");
-    hio.write(aggr_set6, "hash_end_game6_" + to_string(first_bag_idx) + ".dat");
+    container_write(aggr_set5, "hash_end_game5_" + to_string(first_bag_idx) + ".dat");
+    container_write(aggr_set6, "hash_end_game6_" + to_string(first_bag_idx) + ".dat");
 }
 
 int main() {

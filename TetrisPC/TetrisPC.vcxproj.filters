@@ -18,6 +18,12 @@
     <ClCompile Include="TetrisPC.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="basic_traverser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cotainer_wrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="writer.h">
@@ -33,6 +39,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="auxtree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="basic_traverser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="container_wrapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

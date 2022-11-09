@@ -281,12 +281,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="basic_traverser.cpp" />
+    <ClCompile Include="cotainer_wrapper.cpp" />
     <ClCompile Include="TetrisPC.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="auxtree.h" />
     <ClInclude Include="definition.h" />
+    <ClInclude Include="container_wrapper.h" />
     <ClInclude Include="simulator.h" />
+    <ClInclude Include="basic_traverser.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="writer.h" />
   </ItemGroup>
