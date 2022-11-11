@@ -283,12 +283,16 @@
   <ItemGroup>
     <ClCompile Include="basic_traverser.cpp" />
     <ClCompile Include="cotainer_wrapper.cpp" />
+    <ClCompile Include="endgame_generator.cpp" />
+    <ClCompile Include="feasible_field_generator.cpp" />
     <ClCompile Include="TetrisPC.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="auxtree.h" />
     <ClInclude Include="definition.h" />
     <ClInclude Include="container_wrapper.h" />
+    <ClInclude Include="endgame_generator.h" />
+    <ClInclude Include="feasible_field_generator.h" />
     <ClInclude Include="simulator.h" />
     <ClInclude Include="basic_traverser.h" />
     <ClInclude Include="utils.h" />

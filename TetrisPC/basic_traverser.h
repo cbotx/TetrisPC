@@ -26,19 +26,16 @@ class BasicTraverser {
    private:
     int used_count[7];
     std::bitset<10> superposition = 0;
-    int start_bag_idx = 0;
 
-   protected:
-    std::bitset<10> field[40];
-    std::bitset<10> field5[4];
-    std::bitset<10> field6[4];
     int col[10][10];
-    int pieces[10];
     int pieces_ori[10];
     int total = 0;
 
+   protected:
+    int start_bag_idx = 0;
     int first_piece = -1;
-
-    HASH_SET<ull>* hash_set;
-    bool hash_gen = false;
+    std::bitset<10> field[40];
+    std::bitset<10> field5[4];
+    std::bitset<10> field6[4];
+    int pieces[10];
 };

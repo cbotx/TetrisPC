@@ -2,10 +2,10 @@
 
 #include <string>
 
-template <class T>
+template <class T, class V>
 class ContainerWrapper {
    private:
-    T* container;
+    T* container = nullptr;
 
    public:
     ContainerWrapper() = default;
@@ -13,4 +13,8 @@ class ContainerWrapper {
     void loadHashSet(std::string filename);
 
     void setHashSet(T* hs);
+
+    void insert(V&& item);
+
+    bool contains(V&& item);
 };

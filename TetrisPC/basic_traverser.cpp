@@ -326,25 +326,6 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
 }
 
 void BasicTraverser::fc() {
-    if (hash_gen) {
-        for (int i = 0; i < 9; ++i) {
-            hash_set->insert(get_field_hash(field + i * 4));
-        }
-    }
-
-#ifdef DEBUG_PRINT
-    ++total;
-    if (total % 1000000 == 0) {
-        std::cout << first_piece << "  :  ";
-        ll idx = 0;
-        for (int i = 0; i < 10; ++i) {
-            idx *= 19;
-            idx += pieces_ori[i];
-            std::cout << pieces[i];
-        }
-        std::cout << "    " << total << '\n';
-    }
-#endif
 }
 
 void BasicTraverser::fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
