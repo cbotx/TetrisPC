@@ -21,13 +21,22 @@
     <ClCompile Include="basic_traverser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cotainer_wrapper.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="feasible_field_generator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="endgame_generator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="auxiliary_tree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="solver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="solver_task_generator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="solver_parallel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -44,9 +53,6 @@
     <ClInclude Include="simulator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="auxtree.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="basic_traverser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -57,6 +63,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="endgame_generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auxiliary_tree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="solver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="solver_task_generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="solver_parallel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

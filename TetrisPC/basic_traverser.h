@@ -5,11 +5,22 @@
 #include "definition.h"
 
 class BasicTraverser {
+    friend class FeasibleFieldGenerator;
+    friend class EndGameGenerator;
+    friend class AuxiliaryTree;
+    friend class Solver;
+    friend class SolverTaskGenerator;
+    friend class SolverParallel;
+
    public:
     BasicTraverser();
+
     virtual ~BasicTraverser();
+
     BasicTraverser(const BasicTraverser&) = default;
+
     BasicTraverser& operator=(const BasicTraverser&) = default;
+
     void start();
 
    private:
@@ -31,7 +42,6 @@ class BasicTraverser {
     int pieces_ori[10];
     int total = 0;
 
-   protected:
     int start_bag_idx = 0;
     int first_piece = -1;
     std::bitset<10> field[40];

@@ -54,6 +54,11 @@ struct ProbContext {
     int ori = -1;
 };
 
+struct auxNode {
+    opData op;
+    std::vector<auxNode*> v[2];
+};
+
 constexpr int WINDOW_SIZE = 7;
 constexpr int FULL = 1023;
 constexpr char PIECENAME[7] = {'I', 'O', 'T', 'S', 'Z', 'J', 'L'};

@@ -1,4 +1,5 @@
 #pragma once
+#pragma warning(disable : 4996)
 
 #include <bitset>
 #include <string>
@@ -14,11 +15,11 @@ static inline bool equals(double a, double b) {
     return fabs(a - b) < 1e-7;
 }
 
-static inline ull get_field_hash(std::bitset<10>* fp) {
+static inline ull get_field_hash(const std::bitset<10>* fp) {
     return (((fp->to_ullong() << 10) + (fp + 1)->to_ullong() << 10) + (fp + 2)->to_ullong() << 10) + (fp + 3)->to_ullong();
 }
 
-static inline ll get_field_hash_full(std::bitset<10>* fp) {
+static inline ll get_field_hash_full(const std::bitset<10>* fp) {
     ll h = ((((fp->to_ullong() << 16) + (fp + 1)->to_ullong() << 16) + (fp + 2)->to_ullong() << 16) + (fp + 3)->to_ullong()) << 3;
     return h | 0b1110000000000111111000000000011111100000000001111110000000000111;
 }
@@ -77,7 +78,7 @@ static void container_read(T& s, std::string filename) {
     FILE* f = fopen(filename.c_str(), "rb");
     uint64_t size;
     fread(&size, 8, 1, f);
-    vector<ull> v(size);
+    std::vector<ull> v(size);
     fread(v.data(), sizeof(v[0]), size, f);
     fclose(f);
     for (auto& item : v) s.insert(item);

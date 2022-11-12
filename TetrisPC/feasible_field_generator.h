@@ -5,6 +5,8 @@
 #include "definition.h"
 
 class FeasibleFieldGenerator : private BasicTraverser {
+    using HASH_SET_WRAPPER = ContainerWrapper<HASH_SET<ull>, ull>;
+
    public:
     FeasibleFieldGenerator() = default;
 
@@ -14,5 +16,5 @@ class FeasibleFieldGenerator : private BasicTraverser {
     virtual void fc();
 
    private:
-    ContainerWrapper<HASH_SET<ull>, ull> feasible_fields;
+    HASH_SET_WRAPPER feasible_fields;
 };

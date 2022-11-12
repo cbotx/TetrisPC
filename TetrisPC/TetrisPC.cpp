@@ -8,7 +8,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "auxtree.h"
 #include "definition.h"
 #include "simulator.h"
 #include "utils.h"

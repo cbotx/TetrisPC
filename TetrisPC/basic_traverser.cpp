@@ -6,7 +6,6 @@
 #include "utils.h"
 
 BasicTraverser::BasicTraverser() {
-    hash_set = new HASH_SET<ull>;
     memset(used_count, 0, sizeof(used_count));
     memset(field, 0, sizeof(field));
     memset(col, 0, sizeof(col));
