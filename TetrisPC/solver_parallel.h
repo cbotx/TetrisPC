@@ -1,15 +1,16 @@
 #pragma once
-#include "solver.h"
-#include "solver_task_generator.h"
+#include <string>
 
-class SolverParallel : private Solver {
+#include "solver.h"
+#include "solver_divider.h"
+class SolverParallel : public Solver {
    private:
-    SolverTaskGenerator finder_d1;
+    SolverDivider finder_d1;
 
    public:
     explicit SolverParallel(std::string ff_fname, std::string es5_fname, std::string es6_fname);
 
     virtual ~SolverParallel();
 
-    virtual ProbContext findBestMove();
+    ProbContext FindBestMove() override;
 };

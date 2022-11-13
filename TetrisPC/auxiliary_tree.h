@@ -20,20 +20,16 @@ class AuxiliaryTree : private BasicTraverser {
     HASH_SET_WRAPPER feasible_fields;
 
    public:
-    explicit AuxiliaryTree(const HASH_SET_WRAPPER& ff_wr);
+    explicit AuxiliaryTree(const HASH_SET_WRAPPER& ff_wr, const std::deque<int>& v_pieces);
 
-    auxNode* getRoot();
+    virtual ~AuxiliaryTree();
 
-    void constructTree(std::deque<int>& v_pieces);
+    auxNode* GetRoot();
 
-    void destroyTree();
+    double DfsGeneratePiece(int depth, double alpha) override;
 
-    virtual double dfs(int depth, double alpha);
-
-    virtual void fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr);
+    void DfsFitPiece(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) override;
 
    private:
-    void destroy_node(auxNode* node);
-
-    void initialize();
+    void DestroyNode(auxNode* node);
 };

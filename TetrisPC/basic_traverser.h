@@ -6,10 +6,10 @@
 
 class BasicTraverser {
     friend class FeasibleFieldGenerator;
-    friend class EndGameGenerator;
+    friend class EndgameGenerator;
     friend class AuxiliaryTree;
     friend class Solver;
-    friend class SolverTaskGenerator;
+    friend class SolverDivider;
     friend class SolverParallel;
 
    public:
@@ -21,18 +21,18 @@ class BasicTraverser {
 
     BasicTraverser& operator=(const BasicTraverser&) = default;
 
-    void start();
+    void Start();
 
    private:
-    virtual bool prune(int depth);
+    virtual bool Prune(int depth);
 
-    virtual double dfs(int depth, double alpha);
+    virtual double DfsGeneratePiece(int depth, double alpha);
 
-    virtual void try_fit(int piece, std::bitset<10>* fp, int depth, ProbContext& pr);
+    virtual void DfsTryFitPiece(int piece, std::bitset<10>* fp, int depth, ProbContext& pr);
 
-    virtual void fc();
+    virtual void FullClear();
 
-    virtual void fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr);
+    virtual void DfsFitPiece(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr);
 
    private:
     int used_count[7];

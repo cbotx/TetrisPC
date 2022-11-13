@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "container_wrapper.h"
 #include "definition.h"
@@ -21,6 +22,8 @@ class ContainerWrapper {
 
     virtual ~ContainerWrapper();
 
+    void WriteToFile(std::string filename);
+
     void insert(V&& item);
 
     bool contains(const V& item);
@@ -37,7 +40,7 @@ ContainerWrapper<T, V>::ContainerWrapper(std::string filename) : original(true) 
     container_read(*container, filename);
     container->insert(0);  // TODO: add 0 in data file instead of here
 #ifdef DEBUG_PRINT
-    printf("%s size : %ull\n", filename.c_str(), hash_set->size());
+    printf("%s size : %ull\n", filename.c_str(), container->size());
 #endif
 }
 
@@ -49,6 +52,11 @@ ContainerWrapper<T, V>::ContainerWrapper(const ContainerWrapper<T, V>& wr) : ori
 template <class T, class V>
 ContainerWrapper<T, V>::~ContainerWrapper() {
     if (original && container) delete container;
+}
+
+template <class T, class V>
+void ContainerWrapper<T, V>::WriteToFile(std::string filename) {
+    container_write(*container, filename);
 }
 
 template <class T, class V>

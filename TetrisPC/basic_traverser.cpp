@@ -13,15 +13,15 @@ BasicTraverser::BasicTraverser() {
 BasicTraverser::~BasicTraverser() {
 }
 
-void BasicTraverser::start() {
+void BasicTraverser::Start() {
     for (int i = 0; i < 7; ++i) {
         used_count[i] = 1;
     }
     if (first_piece >= 0) ++used_count[first_piece];
-    dfs(0, 0);
+    DfsGeneratePiece(0, 0);
 }
 
-bool BasicTraverser::prune(int depth) {
+bool BasicTraverser::Prune(int depth) {
     int empty_count = 0;
     std::bitset<10>* fp = field + depth * 4;
     std::bitset<10> seperated = (*fp | *fp >> 1) & (*(fp + 1) | *(fp + 1) >> 1) & (*(fp + 2) | *(fp + 2) >> 1) & (*(fp + 3) | *(fp + 3) >> 1);
@@ -32,9 +32,9 @@ bool BasicTraverser::prune(int depth) {
     return false;
 }
 
-double BasicTraverser::dfs(int depth, double alpha) {
+double BasicTraverser::DfsGeneratePiece(int depth, double alpha) {
     ProbContext pr;
-    if (prune(depth)) return 1;
+    if (Prune(depth)) return 1;
     int old_used_count[7];
     std::bitset<10> old_superposition = superposition;
     memcpy(old_used_count, used_count, sizeof(used_count));
@@ -71,7 +71,7 @@ double BasicTraverser::dfs(int depth, double alpha) {
             }
             superposition = 0;
         }
-        try_fit(i, field + depth * 4, depth, pr);
+        DfsTryFitPiece(i, field + depth * 4, depth, pr);
         if (is_collapse) {
             superposition = old_superposition;
             for (int j = 0; j < 7; ++j) {
@@ -85,7 +85,7 @@ double BasicTraverser::dfs(int depth, double alpha) {
     return 1;
 }
 
-void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbContext& pr) {
+void BasicTraverser::DfsTryFitPiece(int piece, std::bitset<10>* fp, int depth, ProbContext& pr) {
     ll h = get_field_hash_full(fp);
     std::bitset<64> bits;
     if (piece == 0) {  // I
@@ -93,7 +93,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         bits = h | h << 16 | h << 32 | h << 48;
         for (int i = 3; i < 13; ++i) {
             if (!bits[i + 3 * 16]) {
-                fit(fp, i - 3, 0, 0, depth, pr);
+                DfsFitPiece(fp, i - 3, 0, 0, depth, pr);
 #ifdef ONLINE_SOLVE
                 if (equals(pr.prob, 1)) return;
 #endif
@@ -104,7 +104,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 10; ++i) {
             for (int j = 0; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 1, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 1, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -116,7 +116,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 2, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 2, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -129,7 +129,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 3, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 3, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -142,7 +142,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 4, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 4, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -154,7 +154,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 5, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 5, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -166,7 +166,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 6, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 6, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -179,7 +179,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 7, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 7, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -191,7 +191,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 8, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 8, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -204,7 +204,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 9, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 9, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -216,7 +216,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 10, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 10, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -229,7 +229,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 11, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 11, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -241,7 +241,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 12, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 12, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -253,7 +253,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 13, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 13, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -265,7 +265,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 14, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 14, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -278,7 +278,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 15, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 15, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -290,7 +290,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 12; ++i) {
             for (int j = 2; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 16, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 16, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -302,7 +302,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 17, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 17, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -314,7 +314,7 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
         for (int i = 3; i < 11; ++i) {
             for (int j = 1; j < 4; ++j) {
                 if (!bits[i + j * 16]) {
-                    fit(fp, i - 3, 3 - j, 18, depth, pr);
+                    DfsFitPiece(fp, i - 3, 3 - j, 18, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -324,14 +324,10 @@ void BasicTraverser::try_fit(int piece, std::bitset<10>* fp, int depth, ProbCont
     }
 }
 
-void BasicTraverser::fc() {
+void BasicTraverser::FullClear() {
 }
 
-void BasicTraverser::fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
-#ifdef DEBUG_PRINT
-    ++func_calls[3][depth];
-    ++depth_cnt[depth];
-#endif
+void BasicTraverser::DfsFitPiece(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
     pieces_ori[depth] = pid;
     for (int i = 0; i < 4; ++i) {
         int nx = x + PIECE_REPR[pid][i][0];
@@ -346,14 +342,14 @@ void BasicTraverser::fit(std::bitset<10>* fp, int x, int y, int pid, int depth, 
 #ifndef ONLINE_SOLVE
         memcpy(col + depth + 1, col + depth, sizeof(col[0]));
 #endif
-        clearLines(fp + 4);
+        clear_lines(fp + 4);
 #ifdef GENERATE_ENDGAME
         if (depth == 4) memcpy(field5, fp + 4, sizeof(*fp) * 4);
         if (depth == 5) memcpy(field6, fp + 4, sizeof(*fp) * 4);
 #endif
-        prob = dfs(depth + 1, pr.prob);
+        prob = DfsGeneratePiece(depth + 1, pr.prob);
     } else {
-        fc();
+        FullClear();
     }
 
     for (int i = 0; i < 4; ++i) {

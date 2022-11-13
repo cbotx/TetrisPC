@@ -33,17 +33,17 @@
     <ClCompile Include="solver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="solver_task_generator.cpp">
+    <ClCompile Include="solver_divider.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="solver_parallel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="simulator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="writer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="definition.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -71,7 +71,7 @@
     <ClInclude Include="solver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="solver_task_generator.h">
+    <ClInclude Include="solver_divider.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="solver_parallel.h">

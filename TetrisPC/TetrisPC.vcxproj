@@ -285,9 +285,10 @@
     <ClCompile Include="endgame_generator.cpp" />
     <ClCompile Include="feasible_field_generator.cpp" />
     <ClCompile Include="auxiliary_tree.cpp" />
+    <ClCompile Include="simulator.cpp" />
     <ClCompile Include="solver.cpp" />
     <ClCompile Include="solver_parallel.cpp" />
-    <ClCompile Include="solver_task_generator.cpp" />
+    <ClCompile Include="solver_divider.cpp" />
     <ClCompile Include="TetrisPC.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -300,9 +301,8 @@
     <ClInclude Include="basic_traverser.h" />
     <ClInclude Include="solver.h" />
     <ClInclude Include="solver_parallel.h" />
-    <ClInclude Include="solver_task_generator.h" />
+    <ClInclude Include="solver_divider.h" />
     <ClInclude Include="utils.h" />
-    <ClInclude Include="writer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "definition.h"
+#include "endgame_generator.h"
+#include "feasible_field_generator.h"
 #include "simulator.h"
+#include "solver_parallel.h"
 #include "utils.h"
-#include "writer.h"
 
 bool debug_switch = false;
 
@@ -55,7 +57,7 @@ class PCFinder {
     PCFinder(const PCFinder&) = default;
     PCFinder& operator=(const PCFinder&) = default;
 
-    void loadHashSet(string filename) {
+    void loadHashSet(std::string filename) {
         container_read(*hash_set, filename);
         hash_set->insert(0);
 #ifdef DEBUG_PRINT
@@ -67,7 +69,7 @@ class PCFinder {
         hash_set = hs;
     }
 
-    void setFirstPiece(int i, int bag_idx) {
+    void SetFirstPiece(int i, int bag_idx) {
         first_piece = i;
         start_bag_idx = bag_idx;
     }
@@ -76,12 +78,12 @@ class PCFinder {
         hash_gen = gen;
     }
 
-    void start() {
+    void Start() {
         for (int i = 0; i < 7; ++i) {
             used_count[i] = 1;
         }
         if (first_piece >= 0) ++used_count[first_piece];
-        dfs(0, 0);
+        DfsGeneratePiece(0, 0);
     }
 
     const HASH_SET<ull>* getHashSet() {
@@ -89,7 +91,7 @@ class PCFinder {
     }
 
    protected:
-    void show_field(int depth) {
+    void ShowField(int depth) {
         for (int i = 3; i >= 0; --i) {
             for (int j = 9; j >= 0; --j) {
                 std::cout << (field[depth * 4 + i][j] ? " 0" : "  ");
@@ -99,7 +101,7 @@ class PCFinder {
         std::cout << '\n';
     }
 
-    virtual bool prune(int depth) {
+    virtual bool Prune(int depth) {
         int empty_count = 0;
         std::bitset<10>* fp = field + depth * 4;
         std::bitset<10> seperated = (*fp | *fp >> 1) & (*(fp + 1) | *(fp + 1) >> 1) & (*(fp + 2) | *(fp + 2) >> 1) & (*(fp + 3) | *(fp + 3) >> 1);
@@ -119,9 +121,9 @@ class PCFinder {
         return h | 0b1110000000000111111000000000011111100000000001111110000000000111;
     }
 
-    virtual double dfs(int depth, double alpha) {
+    virtual double DfsGeneratePiece(int depth, double alpha) {
         ProbContext pr;
-        if (prune(depth)) return 1;
+        if (Prune(depth)) return 1;
         int old_used_count[7];
         std::bitset<10> old_superposition = superposition;
         memcpy(old_used_count, used_count, sizeof(used_count));
@@ -158,7 +160,7 @@ class PCFinder {
                 }
                 superposition = 0;
             }
-            try_fit(i, field + depth * 4, depth, pr);
+            DfsTryFitPiece(i, field + depth * 4, depth, pr);
             if (is_collapse) {
                 superposition = old_superposition;
                 for (int j = 0; j < 7; ++j) {
@@ -177,10 +179,10 @@ class PCFinder {
         if (depth == 0 && first_piece >= 0) {
             pieces[0] = first_piece;
             --used_count[first_piece];
-            try_fit(first_piece, field, 0, pr);
+            DfsTryFitPiece(first_piece, field, 0, pr);
             return 1;
         }
-        if (prune(depth)) return 1;
+        if (Prune(depth)) return 1;
         if (depth == 6) {
             for (int i = 0; i < 7; ++i) ++used_count[i];
         }
@@ -189,7 +191,7 @@ class PCFinder {
             if (!used_count[i]) continue;
             pieces[depth] = i;
             --used_count[i];
-            try_fit(i, field + depth * 4, depth, pr);
+            DfsTryFitPiece(i, field + depth * 4, depth, pr);
             ++used_count[i];
         }
         if (depth == 6) {
@@ -198,7 +200,7 @@ class PCFinder {
         return 1;
     }
 
-    void try_fit(int piece, std::bitset<10>* fp, int depth, ProbContext& pr) {
+    void DfsTryFitPiece(int piece, std::bitset<10>* fp, int depth, ProbContext& pr) {
 #ifdef DEBUG_PRINT
         ++func_calls[2][depth];
 #endif
@@ -209,7 +211,7 @@ class PCFinder {
             bits = h | h << 16 | h << 32 | h << 48;
             for (int i = 3; i < 13; ++i) {
                 if (!bits[i + 3 * 16]) {
-                    fit(fp, i - 3, 0, 0, depth, pr);
+                    DfsFitPiece(fp, i - 3, 0, 0, depth, pr);
 #ifdef ONLINE_SOLVE
                     if (equals(pr.prob, 1)) return;
 #endif
@@ -220,7 +222,7 @@ class PCFinder {
             for (int i = 3; i < 10; ++i) {
                 for (int j = 0; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 1, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 1, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -232,7 +234,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 2, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 2, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -245,7 +247,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 3, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 3, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -258,7 +260,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 4, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 4, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -270,7 +272,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 5, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 5, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -282,7 +284,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 6, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 6, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -295,7 +297,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 7, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 7, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -307,7 +309,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 8, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 8, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -320,7 +322,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 9, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 9, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -332,7 +334,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 10, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 10, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -345,7 +347,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 11, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 11, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -357,7 +359,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 12, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 12, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -369,7 +371,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 13, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 13, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -381,7 +383,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 14, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 14, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -394,7 +396,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 15, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 15, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -406,7 +408,7 @@ class PCFinder {
             for (int i = 3; i < 12; ++i) {
                 for (int j = 2; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 16, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 16, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -418,7 +420,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 17, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 17, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -430,7 +432,7 @@ class PCFinder {
             for (int i = 3; i < 11; ++i) {
                 for (int j = 1; j < 4; ++j) {
                     if (!bits[i + j * 16]) {
-                        fit(fp, i - 3, 3 - j, 18, depth, pr);
+                        DfsFitPiece(fp, i - 3, 3 - j, 18, depth, pr);
 #ifdef ONLINE_SOLVE
                         if (equals(pr.prob, 1)) return;
 #endif
@@ -440,7 +442,7 @@ class PCFinder {
         }
     }
 
-    virtual void fc() {
+    virtual void FullClear() {
         if (hash_gen) {
             for (int i = 0; i < 9; ++i) {
                 hash_set->insert(get_field_hash(field + i * 4));
@@ -462,7 +464,7 @@ class PCFinder {
 #endif
     }
 
-    virtual void fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
+    virtual void DfsFitPiece(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
 #ifdef DEBUG_PRINT
         ++func_calls[3][depth];
         ++depth_cnt[depth];
@@ -481,14 +483,14 @@ class PCFinder {
 #ifndef ONLINE_SOLVE
             memcpy(col + depth + 1, col + depth, sizeof(col[0]));
 #endif
-            clearLines(fp + 4);
+            clear_lines(fp + 4);
 #ifdef GENERATE_ENDGAME
             if (depth == 4) memcpy(field5, fp + 4, sizeof(*fp) * 4);
             if (depth == 5) memcpy(field6, fp + 4, sizeof(*fp) * 4);
 #endif
-            prob = dfs(depth + 1, pr.prob);
+            prob = DfsGeneratePiece(depth + 1, pr.prob);
         } else {
-            fc();
+            FullClear();
         }
 
         for (int i = 0; i < 4; ++i) {
@@ -507,7 +509,7 @@ class PCFinder {
         }
     }
 
-    inline void clearLines(std::bitset<10>* fp) {
+    inline void clear_lines(std::bitset<10>* fp) {
         int c = 0;
         if (*fp == FULL) c += 1;
         if (*(fp + 1) == FULL) c += 2;
@@ -557,7 +559,7 @@ class endGameGenerator : public PCFinder {
     endGameGenerator() : PCFinder() {
     }
 
-    void saveHashEndGame(string hash5, string hash6) {
+    void saveHashEndGame(std::string hash5, std::string hash6) {
         container_write(hash_end_game5, hash5);
         container_write(hash_end_game6, hash6);
     }
@@ -567,20 +569,20 @@ class endGameGenerator : public PCFinder {
         hash6 = &hash_end_game6;
     }
 
-    void setState(int bag_idx, std::deque<int> pieces, std::vector<int> prev_pieces, std::bitset<10> field[4], int depth) {
+    void SetState(int bag_idx, std::deque<int> pieces, std::vector<int> prev_pieces, std::bitset<10> field[4], int depth) {
         this->bag_idx = bag_idx;
         this->v_pieces = pieces;
         this->prev_pieces = prev_pieces;
-        init_field(field, depth);
+        InitializeField(field, depth);
         current_depth = depth;
     }
 
    protected:
-    virtual bool prune(int depth) {
+    virtual bool Prune(int depth) {
         return hash_set->find(get_field_hash(field + depth * 4)) == hash_set->end();
     }
 
-    inline ull get_end_game_hash5() {
+    inline ull GetEndgameHashD5() {
         ull hash = get_field_hash(field5);
         hash <<= 7;
         uint32_t piece_hash = 0;
@@ -590,7 +592,7 @@ class endGameGenerator : public PCFinder {
         return hash | piece_hash;
     }
 
-    inline ull get_end_game_hash6() {
+    inline ull GetEndgameHashD6() {
         ull hash = get_field_hash(field6);
         hash <<= 7;
         uint32_t piece_hash = 0;
@@ -600,18 +602,18 @@ class endGameGenerator : public PCFinder {
         return hash | piece_hash;
     }
 
-    virtual void fc() {
+    virtual void FullClear() {
 #ifdef DEBUG_PRINT
         ++total;
         if (total % 10000000 == 0) {
             std::cout << total << ' ' << hash_end_game5.size() << ' ' << hash_end_game6.size() << '\n';
         }
 #endif
-        hash_end_game5.insert(get_end_game_hash5());
-        hash_end_game6.insert(get_end_game_hash6());
+        hash_end_game5.insert(GetEndgameHashD5());
+        hash_end_game6.insert(GetEndgameHashD6());
     }
 
-    void init_field(std::bitset<10> field[4], int depth) {
+    void InitializeField(std::bitset<10> field[4], int depth) {
         for (int i = 0; i < 4; ++i) {
             this->field[depth * 4 + i] = field[i];
         }
@@ -637,23 +639,23 @@ class auxTree : public PCFinder {
 
    public:
     explicit auxTree(HASH_SET<ull>* s) : PCFinder(), hash_set_r(s) {
-        initialize();
+        Initialize();
     }
     auxNode* getRoot() {
         return root;
     }
 
-    void constructTree(std::deque<int>& v_pieces) {
+    void ConstructTree(std::deque<int>& v_pieces) {
         this->v_pieces = v_pieces;
-        dfs(0, 0);
+        DfsGeneratePiece(0, 0);
     }
 
-    void destroyTree() {
-        destroy_node(root);
-        initialize();
+    void DestroyTree() {
+        DestroyNode(root);
+        Initialize();
     }
 
-    virtual double dfs(int depth, double alpha) {
+    virtual double DfsGeneratePiece(int depth, double alpha) {
         if (hash_set_r->find(get_field_hash(field + depth * 4)) == hash_set_r->end()) return 0;
         ProbContext pr;
 
@@ -661,20 +663,20 @@ class auxTree : public PCFinder {
         v_pieces.pop_front();
         pieces[depth] = p1;
         selections[depth] = 0;
-        try_fit(p1, field + depth * 4, depth, pr);
+        DfsTryFitPiece(p1, field + depth * 4, depth, pr);
         int p2 = v_pieces[0];
         v_pieces.pop_front();
         v_pieces.push_front(p1);
         pieces[depth] = p2;
         selections[depth] = 1;
-        try_fit(p2, field + depth * 4, depth, pr);
+        DfsTryFitPiece(p2, field + depth * 4, depth, pr);
         v_pieces.pop_front();
         v_pieces.push_front(p2);
         v_pieces.push_front(p1);
         return 1;
     }
 
-    virtual void fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
+    virtual void DfsFitPiece(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
         pieces_ori[depth] = pid;
         opData opdata = {pid, x, y};
         ops[depth] = opdata;
@@ -721,11 +723,11 @@ class auxTree : public PCFinder {
                 swap(*(fp + 3), *fp);
             }
             if (depth < 4) {
-                dfs(depth + 1, pr.prob);
-                lowest = min(lowest, depth);
+                DfsGeneratePiece(depth + 1, pr.prob);
+                lowest = std::min(lowest, depth);
             } else {
                 if (hash_set_r->find(get_field_hash(fp)) == hash_set_r->end()) {
-                    lowest = min(lowest, depth);
+                    lowest = std::min(lowest, depth);
                 } else {
                     // construct auxiliary tree
                     p = path[lowest];
@@ -748,13 +750,13 @@ class auxTree : public PCFinder {
     }
 
    private:
-    void destroy_node(auxNode* node) {
+    void DestroyNode(auxNode* node) {
         for (int i = 0; i < 2; ++i) {
-            for (auto& item : node->v[i]) destroy_node(item);
+            for (auto& item : node->v[i]) DestroyNode(item);
         }
         delete node;
     }
-    void initialize() {
+    void Initialize() {
         root = new auxNode();
         p = root;
         path[0] = root;
@@ -788,7 +790,7 @@ class OnlinePCFinder : public PCFinder {
     virtual ~OnlinePCFinder() {
     }
 
-    void clearHashMap() {
+    void ClearHashMap() {
         hash_map->clear();
     }
 
@@ -798,45 +800,45 @@ class OnlinePCFinder : public PCFinder {
         hash_end_game6 = hseg6;
     }
 
-    void setAuxTree(auxTree* tr, auxNode* node) {
+    void SetAuxiliaryTree(auxTree* tr, auxNode* node) {
         aux_tr = tr;
         p = node;
     }
 
-    void setState(int bag_idx, std::deque<int> pieces, std::bitset<7> bag_used, std::bitset<10> field[4], int depth) {
+    void SetState(int bag_idx, std::deque<int> pieces, std::bitset<7> bag_used, std::bitset<10> field[4], int depth) {
         this->bag_idx = bag_idx;
         this->v_pieces = pieces;
         this->bag_used[depth] = bag_used;
-        init_field(field, depth);
+        InitializeField(field, depth);
         current_depth = depth;
         initial_depth = depth;
     }
 
-    void setAlpha(double* p) {
+    void SetAlpha(double* p) {
         p_alpha = p;
     }
 
-    ProbContext calculateProb(int selection, int x, int y, int ori, int depth) {
+    ProbContext CalculateProb(int selection, int x, int y, int ori, int depth) {
         ProbContext pr;
-        if (depth < 5) action(selection, x, y, ori);
-        if (selection == 1) swap(v_pieces[0], v_pieces[1]);
+        if (depth < 5) Action(selection, x, y, ori);
+        if (selection == 1) std::swap(v_pieces[0], v_pieces[1]);
         v_pieces.pop_front();
         bag_idx = (bag_idx + 1) % 7;
-        fit(field + depth * 4, x, y, ori, depth, pr);
+        DfsFitPiece(field + depth * 4, x, y, ori, depth, pr);
         return pr;
     }
 
-    virtual ProbContext findBestMove() {
+    virtual ProbContext FindBestMove() {
         ProbContext pr;
         if (current_depth < 5) {
-            dfs_aux(current_depth, pr);
+            DfsChoosePieceLazyFit(current_depth, pr);
         } else {
-            dfs2(current_depth, pr);
+            DfsChoosePiece(current_depth, pr);
         }
         return pr;
     }
 
-    bool action(int selection, int x, int y, int ori) {
+    bool Action(int selection, int x, int y, int ori) {
         bool succ = false;
         auto& v = p->v[selection];
         for (auto& item : v) {
@@ -850,17 +852,17 @@ class OnlinePCFinder : public PCFinder {
         return succ;
     }
 
-    void constructTree() {
+    void ConstructTree() {
         aux_tr = new auxTree(hash_set);
-        aux_tr->constructTree(v_pieces);
+        aux_tr->ConstructTree(v_pieces);
         p = aux_tr->getRoot();
     }
 
-    void destroyTree() {
-        aux_tr->destroyTree();
+    void DestroyTree() {
+        aux_tr->DestroyTree();
     }
 
-    void loadEndGameHashSet(string hash5, string hash6) {
+    void loadEndGameHashSet(std::string hash5, std::string hash6) {
         hash_end_game5 = new HASH_SET<ull>;
         hash_end_game6 = new HASH_SET<ull>;
         container_read(*hash_end_game5, hash5);
@@ -873,7 +875,7 @@ class OnlinePCFinder : public PCFinder {
     }
 
    protected:
-    inline ull get_state_hash() {
+    inline ull GetStateHash() {
         ull hash = get_field_hash(field + 20);
         for (int i = 0; i < 6; ++i) {
             hash = (hash << 3) | v_pieces[i];
@@ -881,7 +883,7 @@ class OnlinePCFinder : public PCFinder {
         return hash;
     }
 
-    void init_field(std::bitset<10> field[4], int depth) {
+    void InitializeField(std::bitset<10> field[4], int depth) {
         for (int i = 0; i < 4; ++i) {
             this->field[depth * 4 + i] = field[i];
         }
@@ -893,7 +895,7 @@ class OnlinePCFinder : public PCFinder {
         }
     }
 
-    inline bool end_game_prune5(ull field_hash) {
+    inline bool EndgamePruneD5(ull field_hash) {
         for (int i = 0; i < 6; ++i) {
             int piece_hash = 0;
             for (int j = 0; j < 6; ++j) {
@@ -914,7 +916,7 @@ class OnlinePCFinder : public PCFinder {
         return true;
     }
 
-    inline bool end_game_prune6(ull field_hash) {
+    inline bool EndgamePruneD6(ull field_hash) {
         for (int i = 0; i < 5; ++i) {
             int piece_hash = 0;
             for (int j = 0; j < 5; ++j) {
@@ -935,7 +937,7 @@ class OnlinePCFinder : public PCFinder {
         return true;
     }
 
-    virtual double dfs(int depth, double alpha) {
+    virtual double DfsGeneratePiece(int depth, double alpha) {
 #ifdef DEBUG_PRINT
         ++func_calls[4][depth];
 #endif
@@ -946,26 +948,26 @@ class OnlinePCFinder : public PCFinder {
         if (depth + v_pieces.size() >= 11) {
             ProbContext pr;
             if (depth == 4) {
-                dfs_aux(depth, pr);
+                DfsChoosePieceLazyFit(depth, pr);
                 return pr.prob;
             }
-            if (depth == 5 && end_game_prune5(get_field_hash(field + 20))) return 0;
-            if (depth == 6 && end_game_prune6(get_field_hash(field + 24))) return 0;
+            if (depth == 5 && EndgamePruneD5(get_field_hash(field + 20))) return 0;
+            if (depth == 6 && EndgamePruneD6(get_field_hash(field + 24))) return 0;
             if (depth == 5) {
-                ull hash = get_state_hash();
+                ull hash = GetStateHash();
 
                 bool prob = 0;
                 bool is_contain = hash_map->if_contains(hash, [&prob](CONCURRENT_HASH_MAP<ull, bool>::value_type& item) { prob = item.second; });
 
                 if (!is_contain) {
-                    dfs2(depth, pr);
+                    DfsChoosePiece(depth, pr);
                     prob = pr.prob;
                     hash_map->try_emplace_l(
                         hash, [](CONCURRENT_HASH_MAP<ull, bool>::value_type& item) {}, prob);
                 }
                 return prob;
             }
-            dfs2(depth, pr);
+            DfsChoosePiece(depth, pr);
             return pr.prob;
         }
         for (int i = 0; i < 7; ++i) {
@@ -982,7 +984,7 @@ class OnlinePCFinder : public PCFinder {
                 ProbContext pr;
                 v_pieces.push_back(i);
                 bag_used[depth][i] = 1;
-                dfs_aux(depth, pr);
+                DfsChoosePieceLazyFit(depth, pr);
                 bag_used[depth][i] = 0;
                 v_pieces.pop_back();
                 ++cnt2;
@@ -1016,7 +1018,7 @@ class OnlinePCFinder : public PCFinder {
         return prob;
     }
 
-    void dfs_aux(int depth, ProbContext& pr) {
+    void DfsChoosePieceLazyFit(int depth, ProbContext& pr) {
 #ifdef DEBUG_PRINT
         ++func_calls[0][depth];
 #endif
@@ -1029,7 +1031,7 @@ class OnlinePCFinder : public PCFinder {
         auto& v1 = p->v[0];
         for (auto& item : v1) {
             p = item;
-            fit(field + depth * 4, item->op.x, item->op.y, item->op.ori, depth, pr);
+            DfsFitPiece(field + depth * 4, item->op.x, item->op.y, item->op.ori, depth, pr);
 #ifdef ONLINE_SOLVE
             if (equals(pr.prob, 1)) {
                 v_pieces.push_front(p1);
@@ -1049,7 +1051,7 @@ class OnlinePCFinder : public PCFinder {
         auto& v2 = p->v[1];
         for (auto& item : v2) {
             p = item;
-            fit(field + depth * 4, item->op.x, item->op.y, item->op.ori, depth, pr);
+            DfsFitPiece(field + depth * 4, item->op.x, item->op.y, item->op.ori, depth, pr);
 #ifdef ONLINE_SOLVE
             if (equals(pr.prob, 1)) break;
 #endif
@@ -1062,7 +1064,7 @@ class OnlinePCFinder : public PCFinder {
         bag_idx = (bag_idx + 6) % 7;
     }
 
-    void dfs2(int depth, ProbContext& pr) {
+    void DfsChoosePiece(int depth, ProbContext& pr) {
 #ifdef DEBUG_PRINT
         ++func_calls[1][depth];
 #endif
@@ -1070,7 +1072,7 @@ class OnlinePCFinder : public PCFinder {
         int p1 = v_pieces[0];
         v_pieces.pop_front();
         pieces[depth] = p1;
-        try_fit(p1, field + depth * 4, depth, pr);
+        DfsTryFitPiece(p1, field + depth * 4, depth, pr);
 #ifdef ONLINE_SOLVE
         if (equals(pr.prob, 1)) {
             v_pieces.push_front(p1);
@@ -1082,7 +1084,7 @@ class OnlinePCFinder : public PCFinder {
         v_pieces.pop_front();
         v_pieces.push_front(p1);
         pieces[depth] = p2;
-        try_fit(p2, field + depth * 4, depth, pr);
+        DfsTryFitPiece(p2, field + depth * 4, depth, pr);
         v_pieces.pop_front();
         v_pieces.push_front(p2);
         v_pieces.push_front(p1);
@@ -1092,21 +1094,21 @@ class OnlinePCFinder : public PCFinder {
 
 class OnlinePCFinderDepthOne : public OnlinePCFinder {
    private:
-    std::vector<array<int, 7>> v_possible_drops;
+    std::vector<std::array<int, 7>> v_possible_drops;
 
    public:
     OnlinePCFinderDepthOne() : OnlinePCFinder() {}
 
-    void reset() {
+    void Reset() {
         v_possible_drops.clear();
     }
 
-    const std::vector<array<int, 7>>& getPossibleDrops() {
+    const std::vector<std::array<int, 7>>& GetPossibleDrops() {
         return v_possible_drops;
     }
 
    private:
-    virtual void fit(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
+    virtual void DfsFitPiece(std::bitset<10>* fp, int x, int y, int pid, int depth, ProbContext& pr) {
         pieces_ori[depth] = pid;
         for (int i = 0; i < 4; ++i) {
             int nx = x + PIECE_REPR[pid][i][0];
@@ -1114,8 +1116,8 @@ class OnlinePCFinderDepthOne : public OnlinePCFinder {
         }
         std::bitset<10> fp_new[4];
         memcpy(fp_new, fp, sizeof(*fp) * 4);
-        clearLines(fp_new);
-        array<int, 7> drop_data = {fp_new[0].to_ulong(), fp_new[1].to_ulong(), fp_new[2].to_ulong(), fp_new[3].to_ulong(), x, y, pid};
+        clear_lines(fp_new);
+        std::array<int, 7> drop_data = {fp_new[0].to_ulong(), fp_new[1].to_ulong(), fp_new[2].to_ulong(), fp_new[3].to_ulong(), x, y, pid};
         v_possible_drops.push_back(drop_data);
 
         for (int i = 0; i < 4; ++i) {
@@ -1139,15 +1141,15 @@ class OnlinePCFinderParallel : public OnlinePCFinder {
         if (hash_end_game6) delete hash_end_game6;
     }
 
-    virtual ProbContext findBestMove() {
+    virtual ProbContext FindBestMove() {
         ProbContext pr;
-        finder_d1.reset();
+        finder_d1.Reset();
         finder_d1.setHashSet(hash_set);
         finder_d1.setHashSets(hash_map, hash_end_game5, hash_end_game6);
-        finder_d1.setAuxTree(aux_tr, p);
-        finder_d1.setState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
-        finder_d1.findBestMove();
-        std::vector<array<int, 7>> v_possible_drops = finder_d1.getPossibleDrops();
+        finder_d1.SetAuxiliaryTree(aux_tr, p);
+        finder_d1.SetState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
+        finder_d1.FindBestMove();
+        std::vector<std::array<int, 7>> v_possible_drops = finder_d1.GetPossibleDrops();
         int v_size = v_possible_drops.size();
         std::vector<double> v_pr(v_size);
         double* p_alpha = new double(0);
@@ -1157,17 +1159,17 @@ class OnlinePCFinderParallel : public OnlinePCFinder {
             OnlinePCFinder finder;
             finder.setHashSet(hash_set);
             finder.setHashSets(hash_map, hash_end_game5, hash_end_game6);
-            finder.setAuxTree(aux_tr, p);
-            finder.setState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
-            finder.setAlpha(p_alpha);
+            finder.SetAuxiliaryTree(aux_tr, p);
+            finder.SetState(bag_idx, v_pieces, bag_used[current_depth], field + current_depth * 4, current_depth);
+            finder.SetAlpha(p_alpha);
             int selection = (PIECEMAP[item[6]] == v_pieces[0] ? 0 : 1);
-            ProbContext pr = finder.calculateProb(selection, item[4], item[5], item[6], current_depth);
+            ProbContext pr = finder.CalculateProb(selection, item[4], item[5], item[6], current_depth);
             v_pr[i] = pr.prob;
 #pragma omp critical
-            *p_alpha = max(*p_alpha, pr.prob);
+            *p_alpha = std::max(*p_alpha, pr.prob);
         }
         delete p_alpha;
-        clearHashMap();
+        ClearHashMap();
         ProbContext result;
         for (int i = 0; i < v_size; ++i) {
             if (v_pr[i] > result.prob) {
@@ -1181,17 +1183,17 @@ class OnlinePCFinderParallel : public OnlinePCFinder {
 
 void benchmark() {
     PCFinder finder;
-    finder.setFirstPiece(3, 3);
-    finder.start();
+    finder.SetFirstPiece(3, 3);
+    finder.Start();
 }
 
 void generate_hash(int first_bag_idx) {
     std::vector<PCFinder> v_finder(7);
 #pragma omp parallel for
     for (int i = 0; i < 7; ++i) {
-        v_finder[i].setFirstPiece(i, first_bag_idx);
+        v_finder[i].SetFirstPiece(i, first_bag_idx);
         v_finder[i].setHashMode(true);
-        v_finder[i].start();
+        v_finder[i].Start();
     }
     HASH_SET<ull> aggr_set;
     for (int i = 0; i < 7; ++i) {
@@ -1212,16 +1214,16 @@ void solve() {
     Simulator simulator;
     finder.loadHashSet("field_hash.dat");
     finder.loadEndGameHashSet("hash_end_game5.dat", "hash_end_game6.dat");
-    simulator.initialize();
+    simulator.Initialize();
     for (int i = 0; i < 9; ++i) {
         std::deque<int> pieces;
         std::bitset<7> bag_used;
         int bag_idx;
         std::bitset<10> field[4];
-        simulator.getState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
-        finder.setState(bag_idx, pieces, bag_used, field, i);
-        if (i == 0) finder.constructTree();
-        ProbContext pr = finder.findBestMove();
+        simulator.GetState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
+        finder.SetState(bag_idx, pieces, bag_used, field, i);
+        if (i == 0) finder.ConstructTree();
+        ProbContext pr = finder.FindBestMove();
         for (auto& item : pieces) {
             std::cout << PIECENAME[item];
         }
@@ -1233,8 +1235,8 @@ void solve() {
         }
         int selection = 0;
         if (PIECEMAP[pr.ori] == pieces[1]) selection = 1;
-        simulator.action(selection, pr.x, pr.y, pr.ori);
-        if (i < 5) finder.action(selection, pr.x, pr.y, pr.ori);
+        simulator.Action(selection, pr.x, pr.y, pr.ori);
+        if (i < 5) finder.Action(selection, pr.x, pr.y, pr.ori);
 
 #ifdef DEBUG_PRINT
         std::cout << "aux\tdfs2\ttryfit\tfit\tdfs\n";
@@ -1250,68 +1252,18 @@ void solve() {
     }
 }
 
-void solve_parallel(int total_tests) {
-    TIME_BENCHMARK
-    OnlinePCFinderParallel finder_parallel[7];
-    Simulator simulator;
-
-#pragma omp parallel for
-    for (int i = 0; i < 7; ++i) {
-        finder_parallel[i].loadHashSet("field_hash" + to_string(i) + ".dat");
-        finder_parallel[i].loadEndGameHashSet("hash_end_game5_" + to_string(i) + ".dat", "hash_end_game6_" + to_string(i) + ".dat");
-    }
-    simulator.initialize();
-    int failed_tests = 0;
-    TIME_START;
-    for (int x = 0; x < total_tests; ++x) {
-        int pc_idx = simulator.getPCIndex();
-        for (int i = 0; i < 10; ++i) {
-            std::deque<int> pieces;
-            std::bitset<7> bag_used;
-            int bag_idx;
-            std::bitset<10> field[4];
-            simulator.getState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
-            finder_parallel[pc_idx].setState(bag_idx, pieces, bag_used, field, i);
-            if (i == 0) finder_parallel[pc_idx].constructTree();
-            ProbContext pr = finder_parallel[pc_idx].findBestMove();
-#ifdef DEBUG_PRINT
-            for (auto& item : pieces) {
-                std::cout << PIECENAME[item];
-            }
-            std::cout << '\n';
-            std::printf("%.2f%% Winning | Piece Code %d | x=%d y=%d\n", pr.prob * 100, pr.ori, pr.x, pr.y);
-#endif
-            if (pr.ori < 0) {
-                std::cout << "FAILED\n";
-                ++failed_tests;
-                break;
-            }
-            int selection = 0;
-            if (PIECEMAP[pr.ori] == pieces[1]) selection = 1;
-            simulator.action(selection, pr.x, pr.y, pr.ori);
-            if (i < 5) finder_parallel[pc_idx].action(selection, pr.x, pr.y, pr.ori);
-        }
-        finder_parallel[pc_idx].destroyTree();
-        simulator.softReset();
-    }
-    TIME_END;
-    std::cout << "\n========= Summary =========\n";
-    std::printf("Success rate: %.2f%% (%d/%d)", 100.0 * (total_tests - failed_tests) / total_tests, total_tests - failed_tests, total_tests);
-    std::cout << "\n===========================\n";
-}
-
 void solve_test() {
     OnlinePCFinder finder;
     Simulator simulator;
     finder.loadHashSet("field_hash.dat");
-    simulator.initialize();
+    simulator.Initialize();
     std::deque<int> pieces = {6, 0, 5, 3, 2, 0, 1};
     std::bitset<7> bag_used = 0b1111000;
     int bag_idx = 3;
     std::bitset<10> field[4] = {120, 252, 68, 0};
 
-    finder.setState(bag_idx, pieces, bag_used, field, 3);
-    ProbContext pr = finder.findBestMove();
+    finder.SetState(bag_idx, pieces, bag_used, field, 3);
+    ProbContext pr = finder.FindBestMove();
     for (auto& item : pieces) {
         std::cout << PIECENAME[item];
     }
@@ -1326,18 +1278,72 @@ void generate_endgame(int first_bag_idx) {
     HASH_SET<ull> aggr_set5, aggr_set6;
     HASH_SET<ull>*p_set5, *p_set6;
     endGameGenerator generator;
-    generator.loadHashSet("field_hash" + to_string(first_bag_idx) + ".dat");
+    generator.loadHashSet("field_hash" + std::to_string(first_bag_idx) + ".dat");
     for (int i = 0; i < 7; ++i) {
-        generator.setFirstPiece(i, first_bag_idx);
-        generator.start();
+        generator.SetFirstPiece(i, first_bag_idx);
+        generator.Start();
         generator.getHashEndGame(p_set5, p_set6);
         for (auto& item : *p_set5) aggr_set5.insert(item);
         for (auto& item : *p_set6) aggr_set6.insert(item);
         p_set5->clear();
         p_set6->clear();
     }
-    container_write(aggr_set5, "hash_end_game5_" + to_string(first_bag_idx) + ".dat");
-    container_write(aggr_set6, "hash_end_game6_" + to_string(first_bag_idx) + ".dat");
+    container_write(aggr_set5, "hash_end_game5_" + std::to_string(first_bag_idx) + ".dat");
+    container_write(aggr_set6, "hash_end_game6_" + std::to_string(first_bag_idx) + ".dat");
+}
+
+void refactor_generate_endgame(int first_bag_idx) {
+    EndgameGenerator generator("field_hash" + std::to_string(first_bag_idx) + ".dat");
+    generator.Generate(first_bag_idx, "hash_end_game5_" + std::to_string(first_bag_idx) + ".dat", "hash_end_game6_" + std::to_string(first_bag_idx) + ".dat");
+}
+
+void refactor_solve_parallel(int total_tests) {
+    TIME_BENCHMARK
+    SolverParallel* solvers[7];
+    Simulator simulator;
+
+#pragma omp parallel for
+    for (int i = 0; i < 7; ++i) {
+        solvers[i] = new SolverParallel("field_hash" + std::to_string(i) + ".dat", "hash_end_game5_" + std::to_string(i) + ".dat", "hash_end_game6_" + std::to_string(i) + ".dat");
+    }
+    simulator.Initialize();
+    int failed_tests = 0;
+    TIME_START;
+    for (int x = 0; x < total_tests; ++x) {
+        int pc_idx = simulator.GetPCIndex();
+        for (int i = 0; i < 10; ++i) {
+            std::deque<int> pieces;
+            std::bitset<7> bag_used;
+            int bag_idx;
+            std::bitset<10> field[4];
+            simulator.GetState(WINDOW_SIZE, field, pieces, bag_idx, bag_used);
+            solvers[pc_idx]->SetState(bag_idx, pieces, bag_used, field, i);
+            if (i == 0) solvers[pc_idx]->ConstructTree();
+            ProbContext pr = solvers[pc_idx]->FindBestMove();
+#ifdef DEBUG_PRINT
+            for (auto& item : pieces) {
+                std::cout << PIECENAME[item];
+            }
+            std::cout << '\n';
+            std::printf("%.2f%% Winning | Piece Code %d | x=%d y=%d\n", pr.prob * 100, pr.ori, pr.x, pr.y);
+#endif
+            if (pr.ori < 0) {
+                std::cout << "FAILED\n";
+                ++failed_tests;
+                break;
+            }
+            int selection = 0;
+            if (PIECEMAP[pr.ori] == pieces[1]) selection = 1;
+            simulator.Action(selection, pr.x, pr.y, pr.ori);
+            if (i < 5) solvers[pc_idx]->Action(selection, pr.x, pr.y, pr.ori);
+        }
+        solvers[pc_idx]->DestroyTree();
+        simulator.SoftReset();
+    }
+    TIME_END;
+    std::cout << "\n========= Summary =========\n";
+    std::printf("Success rate: %.2f%% (%d/%d)", 100.0 * (total_tests - failed_tests) / total_tests, total_tests - failed_tests, total_tests);
+    std::cout << "\n===========================\n";
 }
 
 int main() {
@@ -1355,6 +1361,6 @@ int main() {
 #endif
 
 #ifdef ONLINE_SOLVE
-    solve_parallel(20);
+    refactor_solve_parallel(2);
 #endif
 }

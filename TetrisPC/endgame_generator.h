@@ -1,11 +1,13 @@
 #pragma once
 
 #include <deque>
+#include <string>
+#include <vector>
 
 #include "basic_traverser.h"
 #include "container_wrapper.h"
 
-class EndGameGenerator : private BasicTraverser {
+class EndgameGenerator : private BasicTraverser {
     using HASH_SET_WRAPPER = ContainerWrapper<HASH_SET<ull>, ull>;
 
    private:
@@ -16,20 +18,22 @@ class EndGameGenerator : private BasicTraverser {
     HASH_SET_WRAPPER feasible_fields, endgame_states_d5, endgame_states_d6;
 
    public:
-    EndGameGenerator(const HASH_SET_WRAPPER& ff_wr);
+    explicit EndgameGenerator(std::string ff_fname);
 
-    virtual ~EndGameGenerator();
+    virtual ~EndgameGenerator();
 
-    void setState(int bag_idx, std::deque<int> pieces, std::vector<int> prev_pieces, std::bitset<10> field[4], int depth);
+    void Generate(int first_bag_idx, std::string es5_fname, std::string es6_fname);
 
    private:
-    inline ull get_end_game_hash5() const;
+    void SetFirstPiece(int i, int bag_idx);
 
-    inline ull get_end_game_hash6() const;
+    inline ull GetEndgameHashD5() const;
 
-    virtual bool prune(int depth);
+    inline ull GetEndgameHashD6() const;
 
-    virtual void fc();
+    bool Prune(int depth) override;
 
-    void init_field(std::bitset<10> field[4], int depth);
+    void FullClear() override;
+
+    void InitializeField(std::bitset<10> field[4], int depth);
 };

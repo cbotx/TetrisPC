@@ -10,10 +10,10 @@ class FeasibleFieldGenerator : private BasicTraverser {
    public:
     FeasibleFieldGenerator() = default;
 
-    void setFirstPiece(int i, int bag_idx);
+    void SetFirstPiece(int i, int bag_idx);
 
    private:
-    virtual void fc();
+    void FullClear() override;
 
    private:
     HASH_SET_WRAPPER feasible_fields;

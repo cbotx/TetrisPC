@@ -1,11 +1,13 @@
 #pragma once
 
+#include <deque>
+#include <string>
+
 #include "auxiliary_tree.h"
 #include "basic_traverser.h"
 #include "container_wrapper.h"
-
 class Solver : private BasicTraverser {
-    friend class SolverTaskGenerator;
+    friend class SolverDivider;
     friend class SolverParallel;
     using HASH_SET_WRAPPER = ContainerWrapper<HASH_SET<ull>, ull>;
     using PARALLEL_HASH_MAP_P = CONCURRENT_HASH_MAP<ull, bool>*;
@@ -35,38 +37,36 @@ class Solver : private BasicTraverser {
 
     virtual ~Solver();
 
-    void clearHashMap();
+    void ClearHashMap();
 
-    void setAuxTree(AuxiliaryTree* tr, auxNode* node);
+    void SetAuxiliaryTree(AuxiliaryTree* tr, auxNode* node);
 
-    void setState(int bag_idx, std::deque<int> pieces, std::bitset<7> bag_used, std::bitset<10> field[4], int depth);
+    void SetState(int bag_idx, std::deque<int> pieces, std::bitset<7> bag_used, std::bitset<10> field[4], int depth);
 
-    void setAlpha(double* p);
+    void SetAlpha(double* p);
 
-    ProbContext calculateProb(int selection, int x, int y, int ori, int depth);
+    ProbContext CalculateProb(int selection, int x, int y, int ori, int depth);
 
-    virtual ProbContext findBestMove();
+    virtual ProbContext FindBestMove();
 
-    bool action(int selection, int x, int y, int ori);
+    bool Action(int selection, int x, int y, int ori);
 
-    void constructTree();
+    void ConstructTree();
 
-    void destroyTree();
-
-    void loadEndGameHashSet(std::string hash5, std::string hash6);
+    void DestroyTree();
 
    private:
-    inline ull get_state_hash();
+    inline ull GetStateHash();
 
-    void init_field(std::bitset<10> field[4], int depth);
+    void InitializeField(std::bitset<10> field[4], int depth);
 
-    inline bool end_game_prune5(ull field_hash);
+    inline bool EndgamePruneD5(ull field_hash);
 
-    inline bool end_game_prune6(ull field_hash);
+    inline bool EndgamePruneD6(ull field_hash);
 
-    virtual double dfs(int depth, double alpha);
+    double DfsGeneratePiece(int depth, double alpha) override;
 
-    void dfs_aux(int depth, ProbContext& pr);
+    void DfsChoosePieceLazyFit(int depth, ProbContext& pr);
 
-    void dfs2(int depth, ProbContext& pr);
+    void DfsChoosePiece(int depth, ProbContext& pr);
 };

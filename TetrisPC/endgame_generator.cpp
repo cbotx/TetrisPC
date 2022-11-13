@@ -1,28 +1,37 @@
 #include "endgame_generator.h"
 
+#include <string>
+#include <vector>
+
 #include "utils.h"
 
-EndGameGenerator::EndGameGenerator(const HASH_SET_WRAPPER& ff_wr)
+EndgameGenerator::EndgameGenerator(std::string ff_fname)
     : BasicTraverser(),
-      feasible_fields(ff_wr) {
+      feasible_fields(ff_fname) {
 }
 
-EndGameGenerator::~EndGameGenerator() {
+EndgameGenerator::~EndgameGenerator() {
 }
 
-void EndGameGenerator::setState(int bag_idx, std::deque<int> pieces, std::vector<int> prev_pieces, std::bitset<10> field[4], int depth) {
-    this->bag_idx = bag_idx;
-    this->v_pieces = pieces;
-    this->prev_pieces = prev_pieces;
-    init_field(field, depth);
-    current_depth = depth;
+void EndgameGenerator::SetFirstPiece(int i, int bag_idx) {
+    first_piece = i;
+    start_bag_idx = bag_idx;
 }
 
-bool EndGameGenerator::prune(int depth) {
-    return feasible_fields.contains(get_field_hash(field + depth * 4));
+void EndgameGenerator::Generate(int first_bag_idx, std::string es5_fname, std::string es6_fname) {
+    for (int i = 0; i < 7; ++i) {
+        SetFirstPiece(i, first_bag_idx);
+        Start();
+    }
+    endgame_states_d5.WriteToFile(es5_fname);
+    endgame_states_d6.WriteToFile(es6_fname);
 }
 
-ull EndGameGenerator::get_end_game_hash5() const {
+bool EndgameGenerator::Prune(int depth) {
+    return !feasible_fields.contains(get_field_hash(field + depth * 4));
+}
+
+ull EndgameGenerator::GetEndgameHashD5() const {
     ull hash = get_field_hash(field5);
     hash <<= 7;
     uint32_t piece_hash = 0;
@@ -32,7 +41,7 @@ ull EndGameGenerator::get_end_game_hash5() const {
     return hash | piece_hash;
 }
 
-ull EndGameGenerator::get_end_game_hash6() const {
+ull EndgameGenerator::GetEndgameHashD6() const {
     ull hash = get_field_hash(field6);
     hash <<= 7;
     uint32_t piece_hash = 0;
@@ -42,18 +51,12 @@ ull EndGameGenerator::get_end_game_hash6() const {
     return hash | piece_hash;
 }
 
-void EndGameGenerator::fc() {
-#ifdef DEBUG_PRINT
-    ++total;
-    if (total % 10000000 == 0) {
-        std::cout << total << ' ' << hash_end_game5.size() << ' ' << hash_end_game6.size() << '\n';
-    }
-#endif
-    endgame_states_d5.insert(get_end_game_hash5());
-    endgame_states_d6.insert(get_end_game_hash6());
+void EndgameGenerator::FullClear() {
+    endgame_states_d5.insert(GetEndgameHashD5());
+    endgame_states_d6.insert(GetEndgameHashD6());
 }
 
-void EndGameGenerator::init_field(std::bitset<10> field[4], int depth) {
+void EndgameGenerator::InitializeField(std::bitset<10> field[4], int depth) {
     for (int i = 0; i < 4; ++i) {
         this->field[depth * 4 + i] = field[i];
     }

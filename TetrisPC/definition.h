@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
 
 #include "gtl/phmap.hpp"
 
@@ -10,8 +11,8 @@
 
 // #define DEBUG_PRINT
 
-typedef long long ll;
-typedef unsigned long long ull;
+typedef int64_t ll;
+typedef uint64_t ull;
 
 template <class T>
 using HASH_SET = gtl::flat_hash_set<T>;
