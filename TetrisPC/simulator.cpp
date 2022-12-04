@@ -14,9 +14,11 @@ Simulator::~Simulator() {
 void Simulator::Initialize() {
     memset(field, 0, sizeof(field));
     pieces.clear();
-    for (int x = 0; x < 3; ++x) {
-        InsertNewBag();
-    }
+    //for (int x = 0; x < 3; ++x) {
+    //    InsertNewBag();
+    //}
+    std::vector<int> x = { 4, 6, 3, 2, 0, 5, 1, 1, 3, 5, 2, 0, 4, 6, 0, 1, 2, 3, 4, 5, 6 };
+    for (auto& item : x) pieces.push_back(item);
     idx = 0;
     pc_idx = 0;
 }

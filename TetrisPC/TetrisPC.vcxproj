@@ -282,6 +282,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="basic_traverser.cpp" />
+    <ClCompile Include="dll_entry.cpp" />
+    <ClCompile Include="dll_interface.cpp" />
     <ClCompile Include="endgame_generator.cpp" />
     <ClCompile Include="feasible_field_generator.cpp" />
     <ClCompile Include="auxiliary_tree.cpp" />
@@ -295,6 +297,7 @@
     <ClInclude Include="auxiliary_tree.h" />
     <ClInclude Include="definition.h" />
     <ClInclude Include="container_wrapper.h" />
+    <ClInclude Include="dll_interface.h" />
     <ClInclude Include="endgame_generator.h" />
     <ClInclude Include="feasible_field_generator.h" />
     <ClInclude Include="simulator.h" />

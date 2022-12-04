@@ -1361,6 +1361,6 @@ int main() {
 #endif
 
 #ifdef ONLINE_SOLVE
-    refactor_solve_parallel(2);
+    refactor_solve_parallel(1);
 #endif
 }

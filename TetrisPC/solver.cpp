@@ -97,6 +97,7 @@ void Solver::ConstructTree() {
 
 void Solver::DestroyTree() {
     delete aux_tr;
+    aux_tr = nullptr;
 }
 
 inline ull Solver::GetStateHash() {
